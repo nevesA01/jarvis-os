@@ -33,6 +33,7 @@ export interface ChatMessage {
   avatar?: string;
   content: string;
   timestamp: string;
+  viaVoice?: boolean;
   reasoningPlan?: {
     intent: string;
     delegatedAgent: AgentId;

@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { MadeWithDyad } from "@/components/made-with-dyad";
 import { CommandBanner, JarvisCoreLogo } from "@/components/visuals/JarvisVisuals";
 import { AgentNetworkTopology } from "@/components/visuals/AgentNetworkTopology";
@@ -7,6 +7,12 @@ import { ApprovalsQueue } from "@/components/approvals/ApprovalsQueue";
 import { VpsTelemetryView } from "@/components/telemetry/VpsTelemetry";
 import { MemoryManager } from "@/components/memory/MemoryManager";
 import { VpsDeployHub } from "@/components/deploy/VpsDeployHub";
+import VoiceOrb from "@/components/visuals/VoiceOrb";
+import {
+  analyzeIntent,
+  buildAgentResponse,
+  type AgentResponseDraft,
+} from "@/lib/agentEngine";
 import {
   JARVIS_AGENTS,
   INITIAL_TELEMETRY,
@@ -21,6 +27,8 @@ import {
   MemoryItem,
   AgentId,
 } from "@/types/jarvis";
+import { useVoiceEngine } from "@/hooks/useVoiceEngine";
+import { useWakeLock } from "@/hooks/useWakeLock";
 import {
   MessageSquare,
   ShieldCheck,
@@ -41,7 +49,7 @@ const Index = () => {
       sender: "supervisor",
       senderName: "Supervisor Nexus",
       content:
-        "👋 Olá, Operador! Sou o **Supervisor Nexus**, o núcleo orquestrador do Jarvis.\n\nEstou monitorando sua VPS e meus 5 agentes especialistas estão em prontidão. Envie um comando e eu farei a análise semântica, verificarei o risco e delegarei a tarefa ao agente adequado.\n\nToda ação crítica passará pela sua aprovação humana antes de ser executada.",
+        "👋 Olá, Operador! Sou o **Supervisor Nexus**, o núcleo orquestrador do Jarvis.\n\nEstou monitorando sua VPS e meus 5 agentes especialistas estão em prontidão. Envie um comando por texto ou por voz (\"Jarvis, status da VPS\") e farei a análise semântica, verificarei o risco e delegarei a tarefa ao agente adequado.\n\nToda ação crítica passará pela sua aprovação humana antes de ser executada.",
       timestamp: "Agora",
       reasoningPlan: {
         intent: "system_boot",
@@ -54,200 +62,110 @@ const Index = () => {
       },
     },
   ]);
-
   const [approvals, setApprovals] = useState<ApprovalRequest[]>(INITIAL_APPROVALS);
   const [memories, setMemories] = useState<MemoryItem[]>(INITIAL_MEMORIES);
   const [containers, setContainers] = useState(INITIAL_CONTAINERS);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [isThinking, setIsThinking] = useState(false);
+  const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
+  const streamTimerRef = useRef<number | null>(null);
 
   const pendingApprovalsCount = approvals.filter((a) => a.status === "pending").length;
 
   const nowTime = () =>
     new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 
+  const appendMessage = useCallback((msg: ChatMessage) => {
+    setMessages((prev) => [...prev, msg]);
+  }, []);
+
+  // Voice engine is created first; commands are forwarded through a stable ref
+  // so the hook can call handleSendMessage defined further below.
+  const handleSendRef = useRef<
+    (text: string, forceAgent?: AgentId | null, viaVoice?: boolean) => void
+  >(() => {});
+  const voice = useVoiceEngine(
+    useCallback((text: string) => handleSendRef.current(text), [])
+  );
+  const voiceRef = useRef(voice);
+  voiceRef.current = voice;
+
+  // ===================== Streaming reveal engine =====================
+  const streamAssistantMessage = useCallback(
+    (draft: AgentResponseDraft, viaVoice = false) => {
+      const id = `msg-${Date.now()}-r${Math.random().toString(36).slice(2, 6)}`;
+      const base: ChatMessage = {
+        id,
+        sender: draft.sender,
+        senderName: draft.senderName,
+        content: "",
+        timestamp: nowTime(),
+        reasoningPlan: draft.reasoningPlan,
+        toolExecution: draft.toolExecution,
+        approvalRequestId: draft.approvalRequestId,
+        viaVoice,
+      };
+      if (draft.newApproval) {
+        setApprovals((prev) => [draft.newApproval as ApprovalRequest, ...prev]);
+      }
+      appendMessage(base);
+      setIsThinking(false);
+      setStreamingMessageId(id);
+
+      const content = draft.content;
+      let i = 0;
+      const CHUNK = 4;
+      const tick = () => {
+        i = Math.min(content.length, i + CHUNK);
+        const slice = content.slice(0, i);
+        setMessages((prev) =>
+          prev.map((m) => (m.id === id ? { ...m, content: slice } : m))
+        );
+        if (i < content.length) {
+          streamTimerRef.current = window.setTimeout(tick, 16);
+        } else {
+          streamTimerRef.current = null;
+          setStreamingMessageId(null);
+          voiceRef.current.speakIfEnabled(content);
+        }
+      };
+      streamTimerRef.current = window.setTimeout(tick, 350);
+    },
+    [appendMessage]
+  );
+
   // ===================== Supervisor Simulation Engine =====================
   const handleSendMessage = useCallback(
-    (text: string) => {
+    (text: string, forceAgent?: AgentId | null, viaVoice = false) => {
       const userMsg: ChatMessage = {
         id: `msg-${Date.now()}`,
         sender: "user",
         senderName: "Você",
         content: text,
         timestamp: nowTime(),
+        viaVoice,
       };
-      setMessages((prev) => [...prev, userMsg]);
+      appendMessage(userMsg);
       setIsThinking(true);
 
-      // Simulated pipeline: Supervisor analyzes intent and risk (mirrors app/agents/supervisor.py)
+      // Pipeline: Supervisor analyzes intent + risk, then delegates
       setTimeout(() => {
-        const lower = text.toLowerCase();
-        const isDestructive = ["delete", "prune", "apagar", "rm -rf", "drop table", "formatar", "ufw allow"].some((k) =>
-          lower.includes(k)
-        );
-        const isSecurity = ["vulnerabilidade", "scan", "pentest", "cve", "semgrep", "owasp", "segurança", "firewall"].some((k) =>
-          lower.includes(k)
-        );
-        const isCoding = ["código", "função", "fastapi", "bug", "refatorar", "react", "api", "dockerfile", "python", "rota"].some((k) =>
-          lower.includes(k)
-        );
-        const isInfra = ["cpu", "ram", "disco", "container", "vps", "docker", "status", "saúde", "memória"].some((k) =>
-          lower.includes(k)
-        );
-
-        if (isDestructive) {
-          const approvalId = `appr-${Math.random().toString(36).slice(2, 8)}`;
-          const newApproval: ApprovalRequest = {
-            id: approvalId,
-            title: "Operação Crítica Retida pelo Supervisor",
-            agentId: "devops",
-            agentName: "Titan Ops",
-            tool: "sandbox_shell_exec",
-            target: "VPS Local / Docker Engine",
-            risk: "high",
-            status: "pending",
-            timestamp: nowTime(),
-            details: {
-              command: text,
-              actionDescription: `O comando recebido foi identificado como potencialmente destrutivo: "${text}"`,
-              riskReason:
-                "Ação pode causar perda de dados, indisponibilidade de serviço ou alteração de configuração crítica da VPS. Requer validação humana obrigatória.",
-              rollbackPlan:
-                "Necessário snapshot prévio. Sem rollback direto disponível para esta operação destrutiva.",
-              diffOrPayload: "Comando enviado ao sandbox de execução para revisão humana.",
-            },
-          };
-          setApprovals((prev) => [newApproval, ...prev]);
-          setIsThinking(false);
-
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: `msg-${Date.now() + 1}`,
-              sender: "supervisor",
-              senderName: "Supervisor Nexus",
-              content: `⚠️ **Ação de Alto Risco Identificada e BLOQUEADA.**\n\nO comando foi retido e enviado para a **Fila de Aprovação Humana** (ID: ${approvalId}). Nada será executado até o seu aval explícito — este é o princípio do Human-in-the-Loop.`,
-              timestamp: nowTime(),
-              reasoningPlan: {
-                intent: "system_critical",
-                delegatedAgent: "devops",
-                risk: "high",
-                requiresApproval: true,
-                modelUsed: "Claude 3.5 (Guardrails)",
-                latencyMs: 156,
-                tokens: 240,
-              },
-              approvalRequestId: approvalId,
-            },
-          ]);
-        } else if (isSecurity) {
-          setIsThinking(false);
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: `msg-${Date.now() + 1}`,
-              sender: "cybersecurity",
-              senderName: "Aegis Sentinel",
-              content: `🛡️ **Relatório de Auditoria Defensiva concluído.**\n\n**Resultados da varredura (somente ativos autorizados):**\n• 0 credenciais vazadas no código-fonte (Gitleaks)\n• 2 CVEs de severidade média encontradas em dependências Python (corrigíveis com pip-audit)\n• Headers HTTP HSTS e X-Frame-Options: ATIVOS no Caddy\n• Escaneamento limitado ao escopo: 127.0.0.1 e meusite.com.br\n\n**Recomendação:** Rodar \`trivy fs --severity HIGH,CRITICAL .\` no pipeline CI/CD semanalmente.`,
-              timestamp: nowTime(),
-              reasoningPlan: {
-                intent: "security_audit",
-                delegatedAgent: "cybersecurity",
-                risk: "medium",
-                requiresApproval: false,
-                modelUsed: "Claude 3.5 Sonnet",
-                latencyMs: 842,
-                tokens: 620,
-              },
-              toolExecution: {
-                toolName: "gitleaks + trivy scan",
-                command: "gitleaks detect --source . && trivy fs .",
-                resultSnippet: "Scan finalizado: 2 achados médios, 0 críticos.",
-                status: "success",
-              },
-            },
-          ]);
-        } else if (isCoding) {
-          setIsThinking(false);
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: `msg-${Date.now() + 1}`,
-              sender: "coder",
-              senderName: "Ares Coder",
-              content: `💻 **Plano de implementação elaborado pelo Ares Coder:**\n\n\`\`\`python\nfrom fastapi import APIRouter, Depends, HTTPException\nfrom pydantic import BaseModel, Field\n\nrouter = APIRouter(prefix="/api/tasks", tags=["tasks"])\n\nclass TaskCreate(BaseModel):\n    title: str = Field(..., min_length=3, max_length=120)\n    priority: int = Field(default=1, ge=1, le=5)\n\n@router.post("/", status_code=201)\nasync def create_task(payload: TaskCreate):\n    # Validação estrita já garantida pelo Pydantic v2\n    return {"ok": True, "task": payload.model_dump()}\n\`\`\`\n\n**Checklist do Coder:**\n1. ✅ Schema Pydantic v2 validado\n2. ✅ Sanitização de entrada aplicada\n3. ✅ Testes pytest sugeridos (test_create_task_201)\n4. ⏳ Aplicar em \`app/api/routes.py\`? (pedir confirmação antes de salvar arquivo)`,
-              timestamp: nowTime(),
-              reasoningPlan: {
-                intent: "coding",
-                delegatedAgent: "coder",
-                risk: "low",
-                requiresApproval: false,
-                modelUsed: "DeepSeek Coder V2",
-                latencyMs: 1240,
-                tokens: 850,
-              },
-              toolExecution: {
-                toolName: "syntax_validator",
-                command: "ruff check app/ --fix",
-                resultSnippet: "All checks passed! 0 errors found.",
-                status: "success",
-              },
-            },
-          ]);
-        } else if (isInfra) {
-          setIsThinking(false);
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: `msg-${Date.now() + 1}`,
-              sender: "devops",
-              senderName: "Titan Ops",
-              content: `🖥️ **Diagnóstico de Infraestrutura — VPS Ubuntu 24.04:**\n\n• **CPU:** 18.4% (4 vCPUs) — ótimo headroom\n• **RAM:** 3.4 GB / 8 GB usados (42.5%)\n• **Containers:** 6/6 ativos e saudáveis\n• **Latência interna de rede Docker:** < 0.4ms\n\nTudo dentro dos limites seguros. Nenhuma ação corretiva necessária.`,
-              timestamp: nowTime(),
-              reasoningPlan: {
-                intent: "infrastructure_check",
-                delegatedAgent: "devops",
-                risk: "low",
-                requiresApproval: false,
-                modelUsed: "Mistral NeMo (Local)",
-                latencyMs: 310,
-                tokens: 190,
-              },
-              toolExecution: {
-                toolName: "docker_ps_inspect",
-                command: "docker stats --no-stream",
-                resultSnippet: "6/6 containers online. RAM total: 2.7GB consumidos.",
-                status: "success",
-              },
-            },
-          ]);
-        } else {
-          setIsThinking(false);
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: `msg-${Date.now() + 1}`,
-              sender: "supervisor",
-              senderName: "Supervisor Nexus",
-              content: `Entendido. Analisei sua solicitação: "${text}"\n\n**Meu plano de execução:**\n1. Recuperei 2 memórias relevantes do seu contexto persistente (stack FastAPI + topologia VPS).\n2. Nenhum risco crítico identificado — classificação: **baixo risco**.\n3. Posso delegar ao **Ares Coder** (código), **Athena Research** (pesquisa) ou executar diretamente.\n\nMe diga qual agente você prefere ou envie "continuar" para eu escolher a melhor rota automaticamente.`,
-              timestamp: nowTime(),
-              reasoningPlan: {
-                intent: "general_planning",
-                delegatedAgent: "supervisor",
-                risk: "low",
-                requiresApproval: false,
-                modelUsed: "Groq Llama-3-70B",
-                latencyMs: 420,
-                tokens: 350,
-              },
-            },
-          ]);
+        const analysis = analyzeIntent(text);
+        if (forceAgent) {
+          analysis.targetAgent = forceAgent as typeof analysis.targetAgent;
         }
-      }, 1200);
+        streamAssistantMessage(buildAgentResponse(text, analysis), viaVoice);
+      }, 900);
     },
-    []
+    [appendMessage, streamAssistantMessage]
   );
 
+  handleSendRef.current = handleSendMessage;
+
+  const handleRegenerate = useCallback(() => {
+    const lastUser = [...messages].reverse().find((m) => m.sender === "user");
+    if (lastUser) handleSendMessage(lastUser.content);
+  }, [messages, handleSendMessage]);
   const handleResolveApproval = useCallback(
     (id: string, decision: "approved" | "rejected", note?: string) => {
       setApprovals((prev) =>
@@ -257,30 +175,27 @@ const Index = () => {
       );
 
       const target = approvals.find((a) => a.id === id);
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `msg-${Date.now()}`,
-          sender: "supervisor",
-          senderName: "Supervisor Nexus",
-          content:
-            decision === "approved"
-              ? `✅ **Autorização humana registrada** para o pedido \`${id}\` (${target?.title}).\n\nO agente ${target?.agentName} já está executando a tarefa em ambiente sandboxed. O resultado aparecerá no canal neural em instantes e será registrado nos logs de auditoria.`
-              : `🚫 **Ação rejeitada pelo operador** (\`${id}\`).\n\nO agente ${target?.agentName} foi instruído a abortar a operação. A justificativa "${note}" foi registrada na memória episódica para aprendizado futuro do sistema.`,
-          timestamp: nowTime(),
-          reasoningPlan: {
-            intent: "human_in_the_loop_review",
-            delegatedAgent: target?.agentId || "supervisor",
-            risk: target?.risk || "high",
-            requiresApproval: false,
-            modelUsed: "Supervisor Guardrails",
-            latencyMs: 25,
-            tokens: 60,
-          },
+      appendMessage({
+        id: `msg-${Date.now()}`,
+        sender: "supervisor",
+        senderName: "Supervisor Nexus",
+        content:
+          decision === "approved"
+            ? `✅ **Autorização humana registrada** para o pedido \`${id}\` (${target?.title}).\n\nO agente ${target?.agentName} já está executando a tarefa em ambiente sandboxed. O resultado aparecerá no canal neural em instantes e será registrado nos logs de auditoria.`
+            : `🚫 **Ação rejeitada pelo operador** (\`${id}\`).\n\nO agente ${target?.agentName} foi instruído a abortar a operação. A justificativa "${note}" foi registrada na memória episódica para aprendizado futuro do sistema.`,
+        timestamp: nowTime(),
+        reasoningPlan: {
+          intent: "human_in_the_loop_review",
+          delegatedAgent: target?.agentId || "supervisor",
+          risk: target?.risk || "high",
+          requiresApproval: false,
+          modelUsed: "Supervisor Guardrails",
+          latencyMs: 25,
+          tokens: 60,
         },
-      ]);
+      });
     },
-    [approvals]
+    [approvals, appendMessage]
   );
 
   const handleAddMemory = useCallback((memory: Omit<MemoryItem, "id" | "createdAt" | "updatedAt">) => {
@@ -310,18 +225,21 @@ const Index = () => {
     setContainers((prev) =>
       prev.map((c) =>
         c.id === containerId
-          ? { ...c, status: "restarting" }
+          ? { ...c, status: "restarting" as const }
           : c
       )
     );
     setTimeout(() => {
       setContainers((prev) =>
         prev.map((c) =>
-          c.id === containerId ? { ...c, status: "running" } : c
+          c.id === containerId ? { ...c, status: "running" as const } : c
         )
       );
     }, 2000);
   }, []);
+
+  // Keep the screen awake while "Sempre Escutando" is active
+  useWakeLock(voice.isEnabled);
 
   const NAV_TABS = [
     { id: "chat" as TabId, label: "Canal Neural", icon: <MessageSquare className="w-4 h-4" /> },
@@ -351,7 +269,7 @@ const Index = () => {
             </span>
           </div>
 
-          {/* Quick nav icons for desktop */}
+          {/* Quick nav for desktop */}
           <nav className="hidden lg:flex items-center gap-1.5">
             {NAV_TABS.map((tab) => (
               <button
@@ -397,10 +315,15 @@ const Index = () => {
         {activeTab === "chat" && (
           <AgentChat
             messages={messages}
+            isStreaming={streamingMessageId !== null || isThinking}
+            streamingMessageId={streamingMessageId}
             onSendMessage={handleSendMessage}
+            onRegenerate={handleRegenerate}
             selectedAgentId={selectedAgentId}
+            onSelectAgent={setSelectedAgentId}
             onClearChat={() => setMessages((prev) => prev.slice(0, 1))}
             onRequestApprovalView={() => setActiveTab("approvals")}
+            voice={voice}
           />
         )}
 
@@ -435,8 +358,8 @@ const Index = () => {
         {activeTab === "deploy" && <VpsDeployHub />}
 
         {/* Supervisor thinking indicator */}
-        {isThinking && (
-          <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-900 border border-sky-500/40 shadow-2xl shadow-sky-950/50">
+        {isThinking && !streamingMessageId && (
+          <div className="fixed bottom-24 lg:bottom-6 left-1/2 -translate-x-1/2 lg:left-auto lg:right-24 lg:translate-x-0 z-40 flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-900 border border-sky-500/40 shadow-2xl shadow-sky-950/50">
             <JarvisCoreLogo size={22} animated />
             <span className="text-xs font-mono text-sky-300 animate-pulse">
               Supervisor Nexus analisando intenção e risco...
@@ -444,6 +367,17 @@ const Index = () => {
           </div>
         )}
       </main>
+
+      {/* Futuristic always-listening voice orb */}
+      <VoiceOrb
+        status={voice.status}
+        micLevel={voice.micLevel}
+        transcript={voice.transcript}
+        isSupported={voice.isSupported}
+        voiceOutput={voice.voiceOutput}
+        onToggle={voice.toggle}
+        onToggleVoiceOutput={voice.toggleVoiceOutput}
+      />
 
       {/* Mobile bottom navigation */}
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-slate-800 bg-[#030712]/95 backdrop-blur-xl">
