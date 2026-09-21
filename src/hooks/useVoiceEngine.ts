@@ -75,16 +75,17 @@ const toSpeech = (raw: string) => {
 
 /** Escolhe a voz pt-BR mais natural disponível (vozes neurais primeiro) */
 const pickVoice = (voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null => {
-  const pt = voices.filter((v) => v.lang.toLowerCase().startsWith("pt"));
+  const ptBr = voices.filter((v) => v.lang.toLowerCase().replace("_", "-") === "pt-br");
+  const pt = ptBr.length ? ptBr : voices.filter((v) => v.lang.toLowerCase().startsWith("pt"));
   if (!pt.length) return null;
   const score = (v: SpeechSynthesisVoice) => {
     const n = v.name.toLowerCase();
-    let s = 0;
-    if (n.includes("natural") || n.includes("online")) s += 100; // Edge/Windows neural
-    if (n.includes("google")) s += 80; // Chrome neural
-    if (n.includes("premium") || n.includes("enhanced")) s += 60;
+    let s = v.lang.toLowerCase().replace("_", "-") === "pt-br" ? 100 : 0;
+    if (n.includes("natural") || n.includes("online")) s += 80;
+    if (n.includes("google")) s += 70;
+    if (n.includes("neural") || n.includes("premium") || n.includes("enhanced")) s += 50;
     if (/luciana|francisca|antonio|thiago|maria/.test(n)) s += 20;
-    if (v.lang.toLowerCase() === "pt-br") s += 10;
+    if (v.default) s += 5;
     return s;
   };
   return pt.reduce((best, v) => (score(v) > score(best) ? v : best), pt[0]);
@@ -417,11 +418,11 @@ export const useVoiceEngine = (onCommand: (text: string) => void): UseVoiceEngin
       updateStatus("speaking");
       playChime(true);
 
-      // Divide em frases curtas e enfileira: a fala começa quase instantâneo
+      // Frases curtas preservam pausas naturais sem criar cortes artificiais.
       const chunks: string[] = [];
       let buf = "";
       for (const sentence of text.split(/(?<=[.!?])\s+/)) {
-        if (buf && (buf + " " + sentence).length > 140) {
+        if (buf && (buf + " " + sentence).length > 190) {
           chunks.push(buf);
           buf = sentence;
         } else {
@@ -430,7 +431,7 @@ export const useVoiceEngine = (onCommand: (text: string) => void): UseVoiceEngin
       }
       if (buf) chunks.push(buf);
 
-      const voice = pickVoice(voicesRef.current);
+      const voice = pickVoice(voicesRef.current.length ? voicesRef.current : synth.getVoices());
       const token = ++speakTokenRef.current;
       const done = () => {
         if (speakTokenRef.current !== token) return;
@@ -443,8 +444,8 @@ export const useVoiceEngine = (onCommand: (text: string) => void): UseVoiceEngin
         const utter = new SpeechSynthesisUtterance(chunk);
         utter.lang = "pt-BR";
         if (voice) utter.voice = voice;
-        utter.rate = 1.25; // ritmo de conversa, sem arrastar
-        utter.pitch = 1.0; // tom neutro (0.9 soava robótico)
+        utter.rate = 1.12;
+        utter.pitch = 1.02;
         utter.volume = 1;
         if (i === chunks.length - 1) {
           utter.onend = done;
