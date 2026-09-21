@@ -269,7 +269,7 @@ export const buildAgentResponse = (text: string, analysis: IntentAnalysis): Agen
   return {
     sender: "supervisor",
     senderName: "Supervisor Nexus",
-    content: `Entendido. Analisei sua solicitação: *"${text.slice(0, 120)}"\n\n## Meu plano de execução\n\n1. **Memória consultada:** recuperei 2 memórias relevantes do seu contexto persistente (stack FastAPI + topologia VPS)\n2. **Análise de risco:** nenhum risco crítico identificado — classificação **baixo risco** ✅\n3. **Delegação disponível:** posso acionar o **Ares Coder** (código), **Aegis Sentinel** (segurança), **Titan Ops** (VPS) ou **Athena Research** (pesquisa)\n\n👉 Me diga qual agente prefere, use o **seletor de agente** no compositor abaixo, ou envie *"continuar"* para eu escolher a melhor rota automaticamente.`,
+    content: `Não encontrei uma ação específica para isso. Pode reformular a pergunta?`,
     reasoningPlan: {
       intent: analysis.intent,
       delegatedAgent: "supervisor",
@@ -277,7 +277,7 @@ export const buildAgentResponse = (text: string, analysis: IntentAnalysis): Agen
       requiresApproval: false,
       modelUsed: analysis.modelUsed,
       latencyMs: 420,
-      tokens: 350,
+      tokens: 24,
     },
   };
 };

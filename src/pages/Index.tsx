@@ -7,6 +7,12 @@ import {
   type AgentResponseDraft,
 } from "@/lib/agentEngine";
 import {
+  describeWeather,
+  extractWeatherCity,
+  fetchCurrentWeather,
+  isWeatherQuestion,
+} from "@/lib/weather";
+import {
   INITIAL_TELEMETRY,
   INITIAL_CONTAINERS,
   INITIAL_APPROVALS,
@@ -138,7 +144,7 @@ const Index = () => {
 
   // ===================== Supervisor Engine =====================
   const handleSendMessage = useCallback(
-    (text: string, forceAgent?: AgentId | null, viaVoice = false) => {
+    async (text: string, forceAgent?: AgentId | null, viaVoice = false) => {
       const userMsg: ChatMessage = {
         id: `msg-${Date.now()}`,
         sender: "user",
@@ -149,16 +155,53 @@ const Index = () => {
       };
       appendMessage(userMsg);
       setIsThinking(true);
-      setAgentBusyWith("Analisando intenção e avaliando risco da operação");
+      setAgentBusyWith("Pensando...");
 
-      setTimeout(() => {
+      if (isWeatherQuestion(text)) {
+        const city = extractWeatherCity(text) || "Manaus";
+        try {
+          const weather = await fetchCurrentWeather(city);
+          streamAssistantMessage({
+            sender: "supervisor",
+            senderName: "Jarvis",
+            content: `Em ${weather.city}, agora está ${weather.temperature.toFixed(1)} °C, com ${describeWeather(weather.weatherCode)}. Sensação de ${weather.feelsLike.toFixed(1)} °C e vento de ${weather.windSpeed.toFixed(1)} km/h.`,
+            reasoningPlan: {
+              intent: "weather_question",
+              delegatedAgent: "supervisor",
+              risk: "low",
+              requiresApproval: false,
+              modelUsed: "Open-Meteo",
+              latencyMs: 420,
+              tokens: 55,
+            },
+          }, viaVoice);
+        } catch {
+          streamAssistantMessage({
+            sender: "supervisor",
+            senderName: "Jarvis",
+            content: `Não consegui consultar o tempo de ${city} agora.`,
+            reasoningPlan: {
+              intent: "weather_question",
+              delegatedAgent: "supervisor",
+              risk: "low",
+              requiresApproval: false,
+              modelUsed: "Open-Meteo",
+              latencyMs: 420,
+              tokens: 20,
+            },
+          }, viaVoice);
+        }
+        return;
+      }
+
+      window.setTimeout(() => {
         const analysis = analyzeIntent(text);
         if (forceAgent) {
           analysis.targetAgent = forceAgent as typeof analysis.targetAgent;
         }
-        setAgentBusyWith(`Delegando para: ${analysis.targetAgent ?? "supervisor"}`);
+        setAgentBusyWith(`Respondendo...`);
         streamAssistantMessage(buildAgentResponse(text, analysis), viaVoice);
-      }, 900);
+      }, 350);
     },
     [appendMessage, streamAssistantMessage]
   );
@@ -266,11 +309,11 @@ const Index = () => {
       const pending = approvals.find((a) => a.status === "pending");
       if (pending) {
         const t = text.toLowerCase();
-        if (/\b(autorizar|autoriza|aprovar|aprova|confirmar|confirma|sim|pode)\b/.test(t)) {
+        if (/\b(autorizar|autoriza|autorizo|aprovar|aprova|aprovo|confirmar|confirma|confirmo|concedo|sim|pode|executa|execute)\b/.test(t)) {
           handleResolveApprovalRef.current(pending.id, "approved", "Autorizado por voz");
           return;
         }
-        if (/\b(recusar|recusa|rejeitar|rejeita|cancelar|cancela|não|nao|negar)\b/.test(t)) {
+        if (/\b(recusar|recusa|recuso|rejeitar|rejeita|rejeito|cancelar|cancela|cancelo|não|nao|negar|nego)\b/.test(t)) {
           handleResolveApprovalRef.current(pending.id, "rejected", "Recusado por voz");
           return;
         }

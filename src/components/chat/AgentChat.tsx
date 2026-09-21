@@ -305,61 +305,6 @@ export const AgentChat: React.FC<Props> = ({
                     : "bg-slate-900/90 text-slate-200 border border-slate-800 rounded-tl-sm shadow-lg"
                 }`}
               >
-                {/* Supervisor Reasoning Plan Card */}
-                {!isUser && msg.reasoningPlan && (
-                  <div className="mb-3 p-3 rounded-xl bg-slate-950/70 border border-slate-800/80 text-xs font-mono space-y-1.5">
-                    <div className="flex items-center justify-between text-[11px] border-b border-slate-800 pb-1.5">
-                      <span className="text-sky-400 flex items-center gap-1">
-                        <Sparkles className="w-3 h-3" />
-                        Decisão do Supervisor
-                      </span>
-                      <span className="text-slate-400">
-                        {msg.reasoningPlan.latencyMs}ms • {msg.reasoningPlan.tokens} tkns
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[11px] pt-1">
-                      <div className="flex items-center gap-1.5">
-                        <Brain className="w-3 h-3 text-slate-500" />
-                        <span className="text-slate-500">Intenção:</span>
-                        <span className="text-slate-300 font-semibold truncate">
-                          {msg.reasoningPlan.intent}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-slate-500">Modelo:</span>
-                        <span className="text-slate-300 truncate">{msg.reasoningPlan.modelUsed}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-slate-500">Risco:</span>
-                        <span
-                          className={`font-semibold uppercase ${
-                            msg.reasoningPlan.risk === "high"
-                              ? "text-rose-400"
-                              : msg.reasoningPlan.risk === "medium"
-                              ? "text-amber-400"
-                              : "text-emerald-400"
-                          }`}
-                        >
-                          {msg.reasoningPlan.risk}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-slate-500">Aprovação:</span>
-                        <span
-                          className={
-                            msg.reasoningPlan.requiresApproval
-                              ? "text-rose-400 font-bold"
-                              : "text-slate-400"
-                          }
-                        >
-                          {msg.reasoningPlan.requiresApproval ? "EXIGIDA ⚠️" : "Não requerida"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
                 {/* Rich Content (markdown + streaming cursor) */}
                 <div className="font-sans text-sm text-slate-100">
                   {isUser ? (
