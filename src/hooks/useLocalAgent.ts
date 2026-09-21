@@ -19,8 +19,24 @@ interface AgentStatusResponse {
   capabilities: string[];
 }
 
-const AGENT_URL = "http://127.0.0.1:3210";
+const AGENT_URLS = ["http://127.0.0.1:3210", "http://localhost:3210"];
 const TOKEN_KEY = "jarvis_local_agent_token";
+
+const fetchAgent = async (path: string, init?: RequestInit) => {
+  let lastError: unknown;
+  for (const baseUrl of AGENT_URLS) {
+    try {
+      return await fetch(`${baseUrl}${path}`, {
+        ...init,
+        cache: "no-store",
+        signal: AbortSignal.timeout(1800),
+      });
+    } catch (caught) {
+      lastError = caught;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("agent_unreachable");
+};
 
 export const useLocalAgent = () => {
   const [status, setStatus] = useState<LocalAgentStatus>("checking");
@@ -30,7 +46,7 @@ export const useLocalAgent = () => {
 
   const checkStatus = useCallback(async () => {
     try {
-      const response = await fetch(`${AGENT_URL}/status`, { signal: AbortSignal.timeout(1800) });
+      const response = await fetchAgent("/status");
       if (!response.ok) throw new Error("status_failed");
       const data = (await response.json()) as AgentStatusResponse;
       setAgentName(data.agentName);
@@ -60,7 +76,7 @@ export const useLocalAgent = () => {
     setStatus("checking");
     setError("");
     try {
-      const response = await fetch(`${AGENT_URL}/pair`, {
+      const response = await fetchAgent("/pair", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pairingCode: pairingCode.trim() }),
@@ -80,7 +96,7 @@ export const useLocalAgent = () => {
   const disconnect = useCallback(async () => {
     const token = tokenRef.current;
     if (token) {
-      await fetch(`${AGENT_URL}/disconnect`, {
+      await fetchAgent("/disconnect", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       }).catch(() => undefined);
@@ -93,7 +109,7 @@ export const useLocalAgent = () => {
   const execute = useCallback(async (request: LocalAgentRequest) => {
     const token = tokenRef.current;
     if (!token) throw new Error("Agente Windows não está pareado");
-    const response = await fetch(`${AGENT_URL}/execute`, {
+    const response = await fetchAgent("/execute", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

@@ -5,12 +5,14 @@ Este agente é um protótipo local. Ele escuta somente em `127.0.0.1:3210` e exi
 ## Como iniciar no Windows
 
 1. Instale o Node.js LTS.
-2. Abra o PowerShell nesta pasta do projeto.
+2. Abra o PowerShell na pasta raiz do projeto, onde ficam `package.json` e `src`.
 3. Execute:
 
 ```powershell
 node .\src\local-agent\agent.mjs
 ```
+
+Se o PowerShell estiver em `C:\Windows\System32`, abra a pasta raiz do projeto no Explorador de Arquivos e escolha **Abrir no Terminal**. Não execute o comando a partir de `C:\Windows\System32`.
 
 4. Mantenha a janela aberta.
 5. Copie o código de pareamento exibido no terminal.

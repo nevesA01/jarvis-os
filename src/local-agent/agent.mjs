@@ -20,6 +20,7 @@ const send = (response, status, body) => {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Max-Age": "600",
     "Cache-Control": "no-store",
   });
   response.end(JSON.stringify(body));
