@@ -167,8 +167,10 @@ export const INITIAL_APPROVALS: ApprovalRequest[] = [
     tool: "docker_prune_volumes",
     target: "VPS Local (Docker Engine)",
     risk: "high",
-    status: "pending",
+    status: "rejected",
     timestamp: "Há 4 minutos",
+    approvedAt: "Há 3 minutos",
+    notes: "Recusado — volumes podiam conter dados do Postgres",
     details: {
       command: "docker volume prune -a --force",
       actionDescription: "O agente DevOps identificou 8 volumes órfãos e deseja liberar 4.2 GB de espaço na VPS.",
@@ -185,8 +187,10 @@ export const INITIAL_APPROVALS: ApprovalRequest[] = [
     tool: "ufw_allow_port",
     target: "Firewall UFW (VPS)",
     risk: "high",
-    status: "pending",
+    status: "rejected",
     timestamp: "Há 12 minutos",
+    approvedAt: "Há 11 minutos",
+    notes: "Recusado — API deve ser exposta só via Caddy/HTTPS",
     details: {
       command: "sudo ufw allow 8000/tcp comment 'Direct API Access'",
       actionDescription: "Solicitação para abrir a porta 8000 da API FastAPI diretamente para a internet pública.",
