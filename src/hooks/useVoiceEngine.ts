@@ -39,9 +39,10 @@ interface SpeechRecognitionLike extends EventTarget {
   onend: (() => void) | null;
 }
 
-const WAKE_WORDS = ["jarvis", "jervis", "jarves", "jarvic"];
+const WAKE_WORDS = ["jarvis", "jervis", "jarves", "jarvic", "jar vis"];
 const WAKE_REGEX = new RegExp(`\\b(${WAKE_WORDS.join("|")})\\b`, "i");
-const SILENCE_MS = 1600;
+const SILENCE_MS = 5000;
+const RESTART_DELAY_MS = 180;
 const DEMO_EMIT_MS = 14000;
 
 const DEMO_COMMANDS = [
@@ -294,7 +295,7 @@ export const useVoiceEngine = (onCommand: (text: string) => void): UseVoiceEngin
       } catch {
         /* already started */
       }
-    }, 350);
+    }, RESTART_DELAY_MS);
   }, []);
 
   const createRecognition = useCallback((): SpeechRecognitionLike | null => {
