@@ -321,7 +321,7 @@ export const ApprovalsQueue: React.FC<Props> = ({
                         className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs font-mono h-11 px-6 shadow-lg shadow-emerald-950/60"
                       >
                         <CheckCircle2 className="w-4 h-4 mr-2" />
-                        Autorizar e Executar
+                        Autorizar solicitação
                       </Button>
                     </div>
                   )}

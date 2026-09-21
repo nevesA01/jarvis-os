@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { AgentChat } from "@/components/chat/AgentChat";
 import { ApprovalsQueue } from "@/components/approvals/ApprovalsQueue";
+import { LocalAgentAccessPanel } from "@/components/access/LocalAgentAccessPanel";
 import { VpsTelemetryView } from "@/components/telemetry/VpsTelemetry";
 import { MemoryManager } from "@/components/memory/MemoryManager";
 import { VpsDeployHub } from "@/components/deploy/VpsDeployHub";
@@ -151,7 +152,9 @@ const ConsoleOverlay = ({
               )}
 
               {tab === "chat" && (
-                <AgentChat
+                <>
+                  <LocalAgentAccessPanel />
+                  <AgentChat
                   messages={messages}
                   isStreaming={streamingMessageId !== null || isThinking}
                   streamingMessageId={streamingMessageId}
@@ -162,7 +165,8 @@ const ConsoleOverlay = ({
                   onClearChat={onClearChat}
                   onRequestApprovalView={() => setTab("approvals")}
                   voice={voice}
-                />
+                  />
+                </>
               )}
               {tab === "approvals" && (
                 <ApprovalsQueue

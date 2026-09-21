@@ -227,8 +227,8 @@ const Index = () => {
         senderName: "Supervisor Nexus",
         content:
           decision === "approved"
-            ? `✅ **Autorização humana registrada** para o pedido \`${id}\` (${target?.title}).\n\nO agente ${target?.agentName} já está executando a tarefa em ambiente sandboxed. O resultado aparecerá no canal neural em instantes e será registrado nos logs de auditoria.`
-            : `🚫 **Ação rejeitada pelo operador** (\`${id}\`).\n\nO agente ${target?.agentName} foi instruído a abortar a operação. A justificativa "${note ?? "sem justificativa"}" foi registrada na memória episódica.`,
+            ? `✅ **Autorização registrada** para o pedido \`${id}\` (${target?.title}).\n\nA interface marcou a solicitação como autorizada, mas a ponte local do Windows ainda não está conectada. Nenhum comando foi executado neste navegador.`
+            : `🚫 **Ação rejeitada pelo operador** (\`${id}\`).\n\nO pedido foi cancelado antes de chegar a qualquer agente local. A justificativa "${note ?? "sem justificativa"}" foi registrada na memória episódica.`,
         timestamp: nowTime(),
         reasoningPlan: {
           intent: "human_in_the_loop_review",
@@ -244,7 +244,7 @@ const Index = () => {
       // Jarvis fala a confirmação
       const spoken =
         decision === "approved"
-          ? `Autorização concedida. Executando ${target?.title ?? "operação"} agora.`
+          ? `Autorização registrada. A ponte local do Windows ainda precisa ser conectada para executar esta ação.`
           : `Entendido. Operação cancelada e registrada na memória.`;
       setCaption(spoken);
       voiceRef.current.speakIfEnabled(spoken);

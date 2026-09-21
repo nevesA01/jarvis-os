@@ -41,11 +41,29 @@ const RESEARCH_KEYWORDS = [
   "pesquisa", "pesquisar", "artigo", "paper", "estudo", "documentação", "documentacao",
   "comparar", "melhor forma", "arxiv", "fontes", "referências", "referencias",
 ];
+const LOCAL_ACTION_KEYWORDS = [
+  "meu pc", "meu computador", "windows", "powershell", "cmd", "arquivo", "arquivos",
+  "pasta", "programa", "aplicativo", "processo", "instalar", "abrir", "executar comando",
+  "execute", "rode", "rodar", "edite", "editar", "modifique", "modificar", "exclua", "apague", "crie", "criar", "salve", "baixar", "download",
+  "crie um projeto", "criar projeto", "editar arquivo", "acesso total",
+];
 
 const hasKeyword = (text: string, list: string[]) => list.some((k) => text.includes(k));
 
 export const analyzeIntent = (text: string): IntentAnalysis => {
   const lower = text.toLowerCase();
+
+  if (hasKeyword(lower, DESTROY_KEYWORDS) || hasKeyword(lower, LOCAL_ACTION_KEYWORDS)) {
+    return {
+      intent: "local_computer_action",
+      targetAgent: "supervisor",
+      agentName: "Supervisor Nexus",
+      risk: "high",
+      requiresApproval: true,
+      modelUsed: "Supervisor Guardrails (Aprovação por Ação)",
+      isDestructive: hasKeyword(lower, DESTROY_KEYWORDS),
+    };
+  }
 
   if (hasKeyword(lower, DESTROY_KEYWORDS)) {
     return {
@@ -117,12 +135,12 @@ export const analyzeIntent = (text: string): IntentAnalysis => {
 export const buildAgentResponse = (text: string, analysis: IntentAnalysis): AgentResponseDraft => {
   const nowTime = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 
-  if (analysis.isDestructive) {
+  if (analysis.intent === "local_computer_action") {
     const approvalId = `appr-${Math.random().toString(36).slice(2, 8)}`;
     return {
       sender: "supervisor",
       senderName: "Supervisor Nexus",
-      content: `⚠️ **Ação de Alto Risco Identificada e BLOQUEADA.**\n\nO comando foi retido pelo sistema de guarda-chuva de segurança e enviado para a **Fila de Aprovação Humana** (ID: \`${approvalId}\`).\n\n**Motivo da retenção:** comandos destrutivos podem causar perda irreversível de dados ou indisponibilidade dos serviços na VPS.\n\n👉 **Nada será executado até o seu aval explícito.** Abra a aba **Aprovações**, revise o comando exato que seria executado, confira o plano de rollback e decida: **Autorizar** ou **Rejeitar** com justificativa.`,
+      content: `🔐 **Ação no computador pausada para sua autorização.**\n\nO Jarvis preparou uma solicitação para o **Agente Local do Windows** e não executará nada antes da sua confirmação (ID: \`${approvalId}\`).\n\nRevise o comando e os arquivos afetados na aba **Aprovações**. Você pode clicar em **Autorizar e Executar** ou dizer **“Jarvis, autorizar”**.`,
       reasoningPlan: {
         intent: analysis.intent,
         delegatedAgent: analysis.targetAgent as any,
@@ -135,22 +153,22 @@ export const buildAgentResponse = (text: string, analysis: IntentAnalysis): Agen
       approvalRequestId: approvalId,
       newApproval: {
         id: approvalId,
-        title: "Operação Crítica Retida pelo Supervisor",
-        agentId: "devops",
-        agentName: "Titan Ops",
-        tool: "sandbox_shell_exec",
-        target: "VPS Local / Docker Engine",
+        title: "Ação no computador aguardando autorização",
+        agentId: "supervisor",
+        agentName: "Supervisor Nexus",
+        tool: "local_agent_request",
+        target: "Computador Windows do operador",
         risk: "high",
         status: "pending",
         timestamp: nowTime,
         details: {
           command: text,
-          actionDescription: `O comando recebido foi identificado como potencialmente destrutivo: "${text}"`,
+          actionDescription: `O Agente Local do Windows prepararia esta ação: "${text}"`,
           riskReason:
-            "Ação pode causar perda de dados, indisponibilidade de serviço ou alteração de configuração crítica da VPS. Requer validação humana obrigatória (Human-in-the-Loop).",
+            "A ação pode ler ou alterar recursos do computador. A autorização humana é obrigatória antes de encaminhar qualquer pedido à ponte local.",
           rollbackPlan:
-            "Necessário snapshot prévio. Sem rollback direto disponível para esta operação destrutiva.",
-          diffOrPayload: "Comando enviado ao sandbox de execução para revisão humana.",
+            "O agente deve mostrar o resultado e interromper a operação quando possível. Para exclusões ou alterações irreversíveis, faça um backup antes de autorizar.",
+          diffOrPayload: "Prévia do pedido criada no navegador; nenhuma ação local foi executada.",
         },
       },
     };
