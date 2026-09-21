@@ -73,6 +73,23 @@ const toSpeech = (raw: string) => {
   return (out || clean.slice(0, 260)).slice(0, 300);
 };
 
+/** Escolhe a voz pt-BR mais natural disponível (vozes neurais primeiro) */
+const pickVoice = (voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null => {
+  const pt = voices.filter((v) => v.lang.toLowerCase().startsWith("pt"));
+  if (!pt.length) return null;
+  const score = (v: SpeechSynthesisVoice) => {
+    const n = v.name.toLowerCase();
+    let s = 0;
+    if (n.includes("natural") || n.includes("online")) s += 100; // Edge/Windows neural
+    if (n.includes("google")) s += 80; // Chrome neural
+    if (n.includes("premium") || n.includes("enhanced")) s += 60;
+    if (/luciana|francisca|antonio|thiago|maria/.test(n)) s += 20;
+    if (v.lang.toLowerCase() === "pt-br") s += 10;
+    return s;
+  };
+  return pt.reduce((best, v) => (score(v) > score(best) ? v : best), pt[0]);
+};
+
 export interface UseVoiceEngineReturn {
   status: VoiceStatus;
   micLevel: number;
@@ -115,6 +132,8 @@ export const useVoiceEngine = (onCommand: (text: string) => void): UseVoiceEngin
   const rafRef = useRef<number | null>(null);
   const silenceTimerRef = useRef<number | null>(null);
   const restartTimerRef = useRef<number | null>(null);
+  const speakTokenRef = useRef(0);
+  const voicesRef = useRef<SpeechSynthesisVoice[]>([]);
   const commandBufferRef = useRef("");
   const demoIndexRef = useRef(0);
   const demoTimersRef = useRef<number[]>([]);
@@ -122,6 +141,18 @@ export const useVoiceEngine = (onCommand: (text: string) => void): UseVoiceEngin
   useEffect(() => {
     voiceOutputRef.current = voiceOutput;
   }, [voiceOutput]);
+
+  /* Carrega vozes cedo (Chrome popula de forma assíncrona) */
+  useEffect(() => {
+    const synth = window.speechSynthesis;
+    if (!synth) return;
+    const load = () => {
+      voicesRef.current = synth.getVoices();
+    };
+    load();
+    synth.addEventListener("voiceschanged", load);
+    return () => synth.removeEventListener("voiceschanged", load);
+  }, []);
 
   const idleStatus = useCallback(
     (): VoiceStatus =>
@@ -377,16 +408,6 @@ export const useVoiceEngine = (onCommand: (text: string) => void): UseVoiceEngin
         return;
       }
       synth.cancel();
-      const utter = new SpeechSynthesisUtterance(text);
-      utter.lang = "pt-BR";
-      utter.rate = 1.05;
-      utter.pitch = 0.92;
-      const voices = synth.getVoices();
-      utter.voice =
-        voices.find((v) => v.lang === "pt-BR") ||
-        voices.find((v) => v.lang.startsWith("pt")) ||
-        null;
-
       suspendedRef.current = true;
       try {
         recognitionRef.current?.stop();
@@ -396,14 +417,41 @@ export const useVoiceEngine = (onCommand: (text: string) => void): UseVoiceEngin
       updateStatus("speaking");
       playChime(true);
 
+      // Divide em frases curtas e enfileira: a fala começa quase instantâneo
+      const chunks: string[] = [];
+      let buf = "";
+      for (const sentence of text.split(/(?<=[.!?])\s+/)) {
+        if (buf && (buf + " " + sentence).length > 140) {
+          chunks.push(buf);
+          buf = sentence;
+        } else {
+          buf = buf ? `${buf} ${sentence}` : sentence;
+        }
+      }
+      if (buf) chunks.push(buf);
+
+      const voice = pickVoice(voicesRef.current);
+      const token = ++speakTokenRef.current;
       const done = () => {
+        if (speakTokenRef.current !== token) return;
         suspendedRef.current = false;
         updateStatus(idleStatus());
         restartRecognition();
       };
-      utter.onend = done;
-      utter.onerror = done;
-      synth.speak(utter);
+
+      chunks.forEach((chunk, i) => {
+        const utter = new SpeechSynthesisUtterance(chunk);
+        utter.lang = "pt-BR";
+        if (voice) utter.voice = voice;
+        utter.rate = 1.25; // ritmo de conversa, sem arrastar
+        utter.pitch = 1.0; // tom neutro (0.9 soava robótico)
+        utter.volume = 1;
+        if (i === chunks.length - 1) {
+          utter.onend = done;
+          utter.onerror = done;
+        }
+        synth.speak(utter);
+      });
     },
     [idleStatus, playChime, restartRecognition, updateStatus]
   );
@@ -463,6 +511,7 @@ export const useVoiceEngine = (onCommand: (text: string) => void): UseVoiceEngin
     }
     recognitionRef.current = null;
     stopLevelMeter();
+    speakTokenRef.current += 1;
     if ("speechSynthesis" in window) window.speechSynthesis.cancel();
     commandBufferRef.current = "";
     setTranscript("");
@@ -478,7 +527,10 @@ export const useVoiceEngine = (onCommand: (text: string) => void): UseVoiceEngin
     setVoiceOutput((v) => {
       const next = !v;
       voiceOutputRef.current = next;
-      if (!next && "speechSynthesis" in window) window.speechSynthesis.cancel();
+      if (!next) {
+        speakTokenRef.current += 1;
+        if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+      }
       if (!next && statusRef.current === "speaking") {
         suspendedRef.current = false;
         updateStatus(idleStatus());
