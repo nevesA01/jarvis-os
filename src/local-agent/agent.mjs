@@ -123,9 +123,16 @@ const server = http.createServer(async (request, response) => {
   }
 });
 
+server.on("error", (error) => {
+  console.error("Falha ao iniciar o agente local:", error.message);
+  process.exitCode = 1;
+});
+
 server.listen(PORT, HOST, () => {
   console.log(`Jarvis Windows Agent ativo em http://${HOST}:${PORT}`);
   console.log(`Nome do computador: ${agentName}`);
   console.log(`Código de pareamento: ${pairingCode}`);
   console.log("Mantenha esta janela aberta enquanto usar o agente.");
 });
+
+process.stdin.resume();
