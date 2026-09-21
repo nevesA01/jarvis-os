@@ -1,5 +1,4 @@
 import { useState, useCallback, useRef } from "react";
-import { MadeWithDyad } from "@/components/made-with-dyad";
 import { CommandBanner, JarvisCoreLogo } from "@/components/visuals/JarvisVisuals";
 import { AgentNetworkTopology } from "@/components/visuals/AgentNetworkTopology";
 import { AgentChat } from "@/components/chat/AgentChat";
@@ -402,11 +401,7 @@ const Index = () => {
         </div>
       </nav>
 
-      <div className="pb-20 lg:pb-0">
-        <div className="text-center py-4">
-          <MadeWithDyad />
-        </div>
-      </div>
+      <div className="pb-20 lg:pb-0" />
     </div>
   );
 };
