@@ -1,19 +1,12 @@
-import { useState, useCallback, useRef } from "react";
-import { CommandBanner, JarvisCoreLogo } from "@/components/visuals/JarvisVisuals";
-import { AgentNetworkTopology } from "@/components/visuals/AgentNetworkTopology";
-import { AgentChat } from "@/components/chat/AgentChat";
-import { ApprovalsQueue } from "@/components/approvals/ApprovalsQueue";
-import { VpsTelemetryView } from "@/components/telemetry/VpsTelemetry";
-import { MemoryManager } from "@/components/memory/MemoryManager";
-import { VpsDeployHub } from "@/components/deploy/VpsDeployHub";
-import VoiceOrb from "@/components/visuals/VoiceOrb";
+import { useState, useCallback, useRef, useEffect } from "react";
+import JarvisCore, { CoreStatus } from "@/components/visuals/JarvisCore";
+import ConsoleOverlay from "@/components/console/ConsoleOverlay";
 import {
   analyzeIntent,
   buildAgentResponse,
   type AgentResponseDraft,
 } from "@/lib/agentEngine";
 import {
-  JARVIS_AGENTS,
   INITIAL_TELEMETRY,
   INITIAL_CONTAINERS,
   INITIAL_APPROVALS,
@@ -25,30 +18,36 @@ import {
   ApprovalRequest,
   MemoryItem,
   AgentId,
+  DockerContainer,
 } from "@/types/jarvis";
 import { useVoiceEngine } from "@/hooks/useVoiceEngine";
 import { useWakeLock } from "@/hooks/useWakeLock";
-import {
-  MessageSquare,
-  ShieldCheck,
-  Activity,
-  Brain,
-  Rocket,
-} from "lucide-react";
 
-type TabId = "chat" | "approvals" | "telemetry" | "memory" | "deploy";
+/** Deriva o modo da esfera a partir do estado atual do sistema */
+const sphereModeFrom = (
+  voiceStatus: string,
+  isThinking: boolean,
+  streaming: boolean,
+  hasApproval: boolean
+): CoreStatus => {
+  if (hasApproval && voiceStatus === "idle") return "alert";
+  if (voiceStatus === "speaking") return "speaking";
+  if (voiceStatus === "processing" || isThinking || streaming) return "processing";
+  if (voiceStatus === "command") return "command";
+  if (voiceStatus === "listening" || voiceStatus === "requesting") return "listening";
+  if (voiceStatus === "demo") return "listening";
+  return "idle";
+};
 
 const Index = () => {
-  const [activeTab, setActiveTab] = useState<TabId>("chat");
-
-  // ===================== Jarvis State =====================
+  const [consoleOpen, setConsoleOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "msg-welcome",
       sender: "supervisor",
       senderName: "Supervisor Nexus",
       content:
-        "👋 Olá, Operador! Sou o **Supervisor Nexus**, o núcleo orquestrador do Jarvis.\n\nEstou monitorando sua VPS e meus 5 agentes especialistas estão em prontidão. Envie um comando por texto ou por voz (\"Jarvis, status da VPS\") e farei a análise semântica, verificarei o risco e delegarei a tarefa ao agente adequado.\n\nToda ação crítica passará pela sua aprovação humana antes de ser executada.",
+        "👋 Olá, Operador! Sou o **Supervisor Nexus**, o núcleo orquestrador do Jarvis.\n\nEstou monitorando sua VPS e meus 5 agentes especialistas estão em prontidão. Envie um comando por texto ou por voz e farei a análise semântica, verificarei o risco e delegarei a tarefa ao agente adequado.\n\nToda ação crítica passará pela sua aprovação humana antes de ser executada.",
       timestamp: "Agora",
       reasoningPlan: {
         intent: "system_boot",
@@ -63,13 +62,16 @@ const Index = () => {
   ]);
   const [approvals, setApprovals] = useState<ApprovalRequest[]>(INITIAL_APPROVALS);
   const [memories, setMemories] = useState<MemoryItem[]>(INITIAL_MEMORIES);
-  const [containers, setContainers] = useState(INITIAL_CONTAINERS);
-  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const [containers, setContainers] = useState<DockerContainer[]>(INITIAL_CONTAINERS);
   const [isThinking, setIsThinking] = useState(false);
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
+  const [caption, setCaption] = useState<string | null>(null);
+  const [agentBusyWith, setAgentBusyWith] = useState<string | null>(null);
+  const captionTimerRef = useRef<number | null>(null);
   const streamTimerRef = useRef<number | null>(null);
 
-  const pendingApprovalsCount = approvals.filter((a) => a.status === "pending").length;
+  const pendingApprovals = approvals.filter((a) => a.status === "pending");
+  const pendingApproval = pendingApprovals[0] ?? null;
 
   const nowTime = () =>
     new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
@@ -78,18 +80,7 @@ const Index = () => {
     setMessages((prev) => [...prev, msg]);
   }, []);
 
-  // Voice engine is created first; commands are forwarded through a stable ref
-  // so the hook can call handleSendMessage defined further below.
-  const handleSendRef = useRef<
-    (text: string, forceAgent?: AgentId | null, viaVoice?: boolean) => void
-  >(() => {});
-  const voice = useVoiceEngine(
-    useCallback((text: string) => handleSendRef.current(text), [])
-  );
-  const voiceRef = useRef(voice);
-  voiceRef.current = voice;
-
-  // ===================== Streaming reveal engine =====================
+  // ===================== Streaming + fala =====================
   const streamAssistantMessage = useCallback(
     (draft: AgentResponseDraft, viaVoice = false) => {
       const id = `msg-${Date.now()}-r${Math.random().toString(36).slice(2, 6)}`;
@@ -111,6 +102,10 @@ const Index = () => {
       setIsThinking(false);
       setStreamingMessageId(id);
 
+      // Legenda em tela durante a "fala"
+      if (captionTimerRef.current) window.clearTimeout(captionTimerRef.current);
+      setCaption(null);
+
       const content = draft.content;
       let i = 0;
       const CHUNK = 4;
@@ -125,7 +120,15 @@ const Index = () => {
         } else {
           streamTimerRef.current = null;
           setStreamingMessageId(null);
+          // Exibe a legenda por alguns segundos e some — estilo filme
           voiceRef.current.speakIfEnabled(content);
+          const plain = content
+            .replace(/```[\s\S]*?```/g, "")
+            .replace(/[*_#>`]/g, "")
+            .trim();
+          setCaption(plain.slice(0, 240));
+          setAgentBusyWith(null);
+          captionTimerRef.current = window.setTimeout(() => setCaption(null), 9000);
         }
       };
       streamTimerRef.current = window.setTimeout(tick, 350);
@@ -133,7 +136,7 @@ const Index = () => {
     [appendMessage]
   );
 
-  // ===================== Supervisor Simulation Engine =====================
+  // ===================== Supervisor Engine =====================
   const handleSendMessage = useCallback(
     (text: string, forceAgent?: AgentId | null, viaVoice = false) => {
       const userMsg: ChatMessage = {
@@ -146,30 +149,52 @@ const Index = () => {
       };
       appendMessage(userMsg);
       setIsThinking(true);
+      setAgentBusyWith("Analisando intenção e avaliando risco da operação");
 
-      // Pipeline: Supervisor analyzes intent + risk, then delegates
       setTimeout(() => {
         const analysis = analyzeIntent(text);
         if (forceAgent) {
           analysis.targetAgent = forceAgent as typeof analysis.targetAgent;
         }
+        setAgentBusyWith(`Delegando para: ${analysis.targetAgent ?? "supervisor"}`);
         streamAssistantMessage(buildAgentResponse(text, analysis), viaVoice);
       }, 900);
     },
     [appendMessage, streamAssistantMessage]
   );
 
-  handleSendRef.current = handleSendMessage;
+  // ===================== Voice =====================
+  const handleSendRef = useRef<
+    (text: string, forceAgent?: AgentId | null, viaVoice?: boolean) => void
+  >(() => {});
+  const voice = useVoiceEngine(
+    useCallback((text: string) => handleSendRef.current(text), [])
+  );
+  const voiceRef = useRef(voice);
+  voiceRef.current = voice;
+  useEffect(() => {
+    handleSendRef.current = handleSendMessage;
+  }, [handleSendMessage]);
+
+  // Esconde a legenda quando você começa a falar de novo
+  useEffect(() => {
+    if (voice.status === "command") setCaption(null);
+  }, [voice.status]);
+
+  useWakeLock(voice.isEnabled);
 
   const handleRegenerate = useCallback(() => {
     const lastUser = [...messages].reverse().find((m) => m.sender === "user");
     if (lastUser) handleSendMessage(lastUser.content);
   }, [messages, handleSendMessage]);
+
   const handleResolveApproval = useCallback(
     (id: string, decision: "approved" | "rejected", note?: string) => {
       setApprovals((prev) =>
         prev.map((appr) =>
-          appr.id === id ? { ...appr, status: decision, approvedAt: nowTime(), notes: note } : appr
+          appr.id === id
+            ? { ...appr, status: decision, approvedAt: nowTime(), notes: note }
+            : appr
         )
       );
 
@@ -181,7 +206,7 @@ const Index = () => {
         content:
           decision === "approved"
             ? `✅ **Autorização humana registrada** para o pedido \`${id}\` (${target?.title}).\n\nO agente ${target?.agentName} já está executando a tarefa em ambiente sandboxed. O resultado aparecerá no canal neural em instantes e será registrado nos logs de auditoria.`
-            : `🚫 **Ação rejeitada pelo operador** (\`${id}\`).\n\nO agente ${target?.agentName} foi instruído a abortar a operação. A justificativa "${note}" foi registrada na memória episódica para aprendizado futuro do sistema.`,
+            : `🚫 **Ação rejeitada pelo operador** (\`${id}\`).\n\nO agente ${target?.agentName} foi instruído a abortar a operação. A justificativa "${note ?? "sem justificativa"}" foi registrada na memória episódica.`,
         timestamp: nowTime(),
         reasoningPlan: {
           intent: "human_in_the_loop_review",
@@ -193,28 +218,36 @@ const Index = () => {
           tokens: 60,
         },
       });
+
+      // Jarvis fala a confirmação
+      const spoken =
+        decision === "approved"
+          ? `Autorização concedida. Executando ${target?.title ?? "operação"} agora.`
+          : `Entendido. Operação cancelada e registrada na memória.`;
+      setCaption(spoken);
+      voiceRef.current.speakIfEnabled(spoken);
+      if (captionTimerRef.current) window.clearTimeout(captionTimerRef.current);
+      captionTimerRef.current = window.setTimeout(() => setCaption(null), 6000);
     },
     [approvals, appendMessage]
   );
 
-  const handleAddMemory = useCallback((memory: Omit<MemoryItem, "id" | "createdAt" | "updatedAt">) => {
-    const now = new Date().toLocaleString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-    setMemories((prev) => [
-      {
-        ...memory,
-        id: `mem-${Date.now()}`,
-        createdAt: now,
-        updatedAt: now,
-      },
-      ...prev,
-    ]);
-  }, []);
+  const handleAddMemory = useCallback(
+    (memory: Omit<MemoryItem, "id" | "createdAt" | "updatedAt">) => {
+      const now = new Date().toLocaleString("pt-BR", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      setMemories((prev) => [
+        { ...memory, id: `mem-${Date.now()}`, createdAt: now, updatedAt: now },
+        ...prev,
+      ]);
+    },
+    []
+  );
 
   const handleDeleteMemory = useCallback((id: string) => {
     setMemories((prev) => prev.filter((m) => m.id !== id));
@@ -223,9 +256,7 @@ const Index = () => {
   const handleRestartContainer = useCallback((containerId: string) => {
     setContainers((prev) =>
       prev.map((c) =>
-        c.id === containerId
-          ? { ...c, status: "restarting" as const }
-          : c
+        c.id === containerId ? { ...c, status: "restarting" as const } : c
       )
     );
     setTimeout(() => {
@@ -237,171 +268,61 @@ const Index = () => {
     }, 2000);
   }, []);
 
-  // Keep the screen awake while "Sempre Escutando" is active
-  useWakeLock(voice.isEnabled);
+  useEffect(() => {
+    return () => {
+      if (streamTimerRef.current) window.clearTimeout(streamTimerRef.current);
+      if (captionTimerRef.current) window.clearTimeout(captionTimerRef.current);
+    };
+  }, []);
 
-  const NAV_TABS = [
-    { id: "chat" as TabId, label: "Canal Neural", icon: <MessageSquare className="w-4 h-4" /> },
-    { id: "approvals" as TabId, label: "Aprovações", icon: <ShieldCheck className="w-4 h-4" />, badge: pendingApprovalsCount },
-    { id: "telemetry" as TabId, label: "Telemetria VPS", icon: <Activity className="w-4 h-4" /> },
-    { id: "memory" as TabId, label: "Memória", icon: <Brain className="w-4 h-4" /> },
-    { id: "deploy" as TabId, label: "Deploy VPS", icon: <Rocket className="w-4 h-4" /> },
-  ];
+  const sphereMode = sphereModeFrom(
+    voice.status,
+    isThinking,
+    streamingMessageId !== null,
+    pendingApproval !== null
+  );
 
   return (
-    <div className="min-h-screen bg-[#030712] text-slate-100">
-      {/* ===================== Top Header Bar ===================== */}
-      <header className="sticky top-0 z-40 border-b border-slate-800/80 bg-[#030712]/90 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setActiveTab("chat")}
-              className="flex items-center gap-2.5 group"
-            >
-              <JarvisCoreLogo size={34} animated />
-              <span className="text-lg font-extrabold tracking-tight text-white group-hover:text-sky-400 transition-colors">
-                JARVIS <span className="text-sky-400 font-mono text-sm font-semibold">OS</span>
-              </span>
-            </button>
-            <span className="hidden md:inline-flex text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-              ● SISTEMA ONLINE — VPS CONECTADA
-            </span>
-          </div>
-
-          {/* Quick nav for desktop */}
-          <nav className="hidden lg:flex items-center gap-1.5">
-            {NAV_TABS.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`relative px-3.5 py-2 rounded-xl text-xs font-mono font-semibold transition-all flex items-center gap-2 ${
-                  activeTab === tab.id
-                    ? "bg-sky-500/15 text-sky-300 border border-sky-500/40"
-                    : "text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent"
-                }`}
-              >
-                {tab.icon}
-                {tab.label}
-                {!!tab.badge && tab.badge > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white px-1 shadow-lg shadow-rose-950/60">
-                    {tab.badge}
-                  </span>
-                )}
-              </button>
-            ))}
-          </nav>
-        </div>
-      </header>
-
-      {/* ===================== Main Content Area ===================== */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6 pb-16">
-        {/* HUD Banner (visible on top-level views) */}
-        {activeTab !== "chat" && <CommandBanner activeAgentCount={6} />}
-
-        {/* Agent Topology strip on Chat and Telemetry tabs */}
-        {(activeTab === "chat" || activeTab === "telemetry") && (
-          <AgentNetworkTopology
-            agents={JARVIS_AGENTS}
-            selectedAgentId={selectedAgentId}
-            onSelectAgent={(id) =>
-              setSelectedAgentId((prev) => (prev === id ? null : id))
-            }
-            pendingApprovalsCount={pendingApprovalsCount}
-          />
-        )}
-
-        {/* --- TAB: CHAT --- */}
-        {activeTab === "chat" && (
-          <AgentChat
-            messages={messages}
-            isStreaming={streamingMessageId !== null || isThinking}
-            streamingMessageId={streamingMessageId}
-            onSendMessage={handleSendMessage}
-            onRegenerate={handleRegenerate}
-            selectedAgentId={selectedAgentId}
-            onSelectAgent={setSelectedAgentId}
-            onClearChat={() => setMessages((prev) => prev.slice(0, 1))}
-            onRequestApprovalView={() => setActiveTab("approvals")}
-            voice={voice}
-          />
-        )}
-
-        {/* --- TAB: APPROVALS --- */}
-        {activeTab === "approvals" && (
-          <ApprovalsQueue
-            approvals={approvals}
-            onResolveApproval={handleResolveApproval}
-          />
-        )}
-
-        {/* --- TAB: TELEMETRY --- */}
-        {activeTab === "telemetry" && (
-          <VpsTelemetryView
-            telemetry={INITIAL_TELEMETRY}
-            containers={containers}
-            auditLogs={INITIAL_AUDIT_LOGS}
-            onRestartContainer={handleRestartContainer}
-          />
-        )}
-
-        {/* --- TAB: MEMORY --- */}
-        {activeTab === "memory" && (
-          <MemoryManager
-            memories={memories}
-            onAddMemory={handleAddMemory}
-            onDeleteMemory={handleDeleteMemory}
-          />
-        )}
-
-        {/* --- TAB: DEPLOY HUB --- */}
-        {activeTab === "deploy" && <VpsDeployHub />}
-
-        {/* Supervisor thinking indicator */}
-        {isThinking && !streamingMessageId && (
-          <div className="fixed bottom-24 lg:bottom-6 left-1/2 -translate-x-1/2 lg:left-auto lg:right-24 lg:translate-x-0 z-40 flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-900 border border-sky-500/40 shadow-2xl shadow-sky-950/50">
-            <JarvisCoreLogo size={22} animated />
-            <span className="text-xs font-mono text-sky-300 animate-pulse">
-              Supervisor Nexus analisando intenção e risco...
-            </span>
-          </div>
-        )}
-      </main>
-
-      {/* Futuristic always-listening voice orb */}
-      <VoiceOrb
-        status={voice.status}
+    <div className="bg-[#02040a] min-h-screen">
+      <JarvisCore
+        status={sphereMode}
         micLevel={voice.micLevel}
         transcript={voice.transcript}
+        caption={caption}
+        agentBusyWith={agentBusyWith}
+        pendingApproval={pendingApproval}
         isSupported={voice.isSupported}
-        voiceOutput={voice.voiceOutput}
-        onToggle={voice.toggle}
+        listeningOn={voice.isEnabled}
+        onToggleListening={() => {
+          voice.toggle();
+        }}
         onToggleVoiceOutput={voice.toggleVoiceOutput}
+        voiceOutput={voice.voiceOutput}
+        onResolveApproval={(id, decision) =>
+          handleResolveApproval(id, decision, undefined)
+        }
+        onOpenConsole={() => setConsoleOpen(true)}
+        onManualCommand={(text) => handleSendMessage(text)}
       />
 
-      {/* Mobile bottom navigation */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-slate-800 bg-[#030712]/95 backdrop-blur-xl">
-        <div className="flex items-center justify-around px-2 py-2">
-          {NAV_TABS.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`relative flex flex-col items-center gap-1 px-3 py-1.5 rounded-xl transition-all ${
-                activeTab === tab.id ? "text-sky-400 bg-sky-500/10" : "text-slate-500 hover:text-slate-300"
-              }`}
-            >
-              {tab.icon}
-              <span className="text-[10px] font-mono font-semibold">{tab.label.split(" ")[0]}</span>
-              {!!tab.badge && tab.badge > 0 && (
-                <span className="absolute top-0 right-1 min-w-[16px] h-4 flex items-center justify-center rounded-full bg-rose-500 text-[9px] font-bold text-white px-1">
-                  {tab.badge}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-      </nav>
-
-      <div className="pb-20 lg:pb-0" />
+      <ConsoleOverlay
+        open={consoleOpen}
+        onClose={() => setConsoleOpen(false)}
+        messages={messages}
+        streamingMessageId={streamingMessageId}
+        isThinking={isThinking}
+        onSendMessage={(text, forceAgent) => handleSendMessage(text, forceAgent)}
+        onRegenerate={handleRegenerate}
+        onClearChat={() => setMessages((prev) => prev.slice(0, 1))}
+        approvals={approvals}
+        onResolveApproval={handleResolveApproval}
+        memories={memories}
+        onAddMemory={handleAddMemory}
+        onDeleteMemory={handleDeleteMemory}
+        containers={containers}
+        onRestartContainer={handleRestartContainer}
+        voice={voice}
+      />
     </div>
   );
 };
