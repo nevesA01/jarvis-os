@@ -167,9 +167,12 @@ const Index = () => {
   const handleSendRef = useRef<
     (text: string, forceAgent?: AgentId | null, viaVoice?: boolean) => void
   >(() => {});
-  const voice = useVoiceEngine(
-    useCallback((text: string) => handleSendRef.current(text), [])
-  );
+  const voiceCommandRef = useRef<(text: string) => void>(() => {});
+
+  const voice = useVoiceEngine(useCallback((text: string) => {
+    // Intercepta respostas de autorização pendente antes de rotear ao supervisor
+    voiceCommandRef.current(text);
+  }, []));
   const voiceRef = useRef(voice);
   voiceRef.current = voice;
   useEffect(() => {
@@ -180,6 +183,25 @@ const Index = () => {
   useEffect(() => {
     if (voice.status === "command") setCaption(null);
   }, [voice.status]);
+
+  // Saudação falada na primeira ativação da sessão
+  const greetedRef = useRef(false);
+  useEffect(() => {
+    if (voice.isEnabled && !greetedRef.current) {
+      greetedRef.current = true;
+      const hour = new Date().getHours();
+      const greeting =
+        hour < 12
+          ? "Bom dia"
+          : hour < 18
+          ? "Boa tarde"
+          : "Boa noite";
+      const msg = `${greeting}, senhor. Todos os sistemas operacionais. Agentes em prontidão.`;
+      setCaption(msg);
+      voiceRef.current.speakIfEnabled(msg);
+      captionTimerRef.current = window.setTimeout(() => setCaption(null), 7000);
+    }
+  }, [voice.isEnabled]);
 
   useWakeLock(voice.isEnabled);
 
@@ -231,6 +253,31 @@ const Index = () => {
     },
     [approvals, appendMessage]
   );
+
+  // Autorização por voz: "autorizar/sim" aprova, "recusar/não/cancelar" rejeita.
+  // Roda antes do roteamento normal, só quando há pedido pendente.
+  const handleResolveApprovalRef = useRef(handleResolveApproval);
+  useEffect(() => {
+    handleResolveApprovalRef.current = handleResolveApproval;
+  }, [handleResolveApproval]);
+
+  useEffect(() => {
+    voiceCommandRef.current = (text: string) => {
+      const pending = approvals.find((a) => a.status === "pending");
+      if (pending) {
+        const t = text.toLowerCase();
+        if (/\b(autorizar|autoriza|aprovar|aprova|confirmar|confirma|sim|pode)\b/.test(t)) {
+          handleResolveApprovalRef.current(pending.id, "approved", "Autorizado por voz");
+          return;
+        }
+        if (/\b(recusar|recusa|rejeitar|rejeita|cancelar|cancela|não|nao|negar)\b/.test(t)) {
+          handleResolveApprovalRef.current(pending.id, "rejected", "Recusado por voz");
+          return;
+        }
+      }
+      handleSendRef.current(text);
+    };
+  }, [approvals]);
 
   const handleAddMemory = useCallback(
     (memory: Omit<MemoryItem, "id" | "createdAt" | "updatedAt">) => {

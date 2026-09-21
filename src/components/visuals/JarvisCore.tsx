@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import NeuralSphere, { SphereMode } from "./NeuralSphere";
 import { ApprovalRequest } from "@/types/jarvis";
 import {
@@ -6,8 +6,11 @@ import {
   X,
   Check,
   Mic,
-  MicOff,
+  Power,
   Terminal,
+  Volume2,
+  VolumeX,
+  Keyboard,
 } from "lucide-react";
 
 const StatusBar = ({ label }: { label: string }) => (
@@ -19,19 +22,6 @@ const StatusBar = ({ label }: { label: string }) => (
     <span className="font-mono text-[11px] tracking-[0.45em] text-cyan-200/80">
       {label}
     </span>
-  </div>
-);
-
-const CommandRow = () => (
-  <div className="flex items-center gap-2 opacity-40">
-    {["DASH", "▸", "◈", "◉", "◇", "▣"].map((glyph, i) => (
-      <span
-        key={i}
-        className="w-6 h-6 flex items-center justify-center font-mono text-[9px] text-cyan-300/70 border border-cyan-500/25 rounded-md"
-      >
-        {glyph}
-      </span>
-    ))}
   </div>
 );
 
@@ -63,6 +53,13 @@ const BOOT_LINES = [
   "J.A.R.V.I.S. ONLINE",
 ];
 
+const IDLE_HINTS = [
+  "Diga: “Jarvis, status da VPS”",
+  "Diga: “Jarvis, audite as portas do firewall”",
+  "Diga: “Jarvis, crie um endpoint FastAPI”",
+  "Diga: “Jarvis, pesquise orquestração com LangGraph”",
+];
+
 const JarvisCore = ({
   status,
   micLevel,
@@ -79,23 +76,79 @@ const JarvisCore = ({
   onOpenConsole,
   onManualCommand,
 }: JarvisCoreProps) => {
-  const [bootStep, setBootStep] = useState(0);
+  const [bootStep, setBootStep] = useState(() =>
+    typeof sessionStorage !== "undefined" &&
+    sessionStorage.getItem("jarvis_booted")
+      ? BOOT_LINES.length
+      : 0
+  );
   const [manualOpen, setManualOpen] = useState(false);
   const [manualText, setManualText] = useState("");
+  const [hintIndex, setHintIndex] = useState(0);
+  const [hintVisible, setHintVisible] = useState(true);
+  const hintTimerRef = useRef<number | null>(null);
 
   const booted = bootStep >= BOOT_LINES.length;
 
+  /* ---------- Boot sequence ---------- */
   useEffect(() => {
-    if (booted) return;
+    if (booted) {
+      sessionStorage.setItem("jarvis_booted", "1");
+      return;
+    }
     const t = window.setTimeout(
       () => setBootStep((s) => s + 1),
-      bootStep === 0 ? 350 : 480
+      bootStep === 0 ? 300 : 340
     );
     return () => window.clearTimeout(t);
   }, [bootStep, booted]);
 
+  /* ---------- Atalho de teclado: “/” abre o comando manual ---------- */
+  useEffect(() => {
+    if (!booted || !listeningOn) return;
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const typing =
+        target.tagName === "INPUT" || target.tagName === "TEXTAREA";
+      if (typing) return;
+      if (e.key === "/" || e.key === "t" || e.key === "T") {
+        e.preventDefault();
+        setManualOpen(true);
+      }
+      if (e.key === "Escape") setManualOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [booted, listeningOn]);
+
+  /* ---------- Dicas de voz em rotação quando ocioso ---------- */
+  const showIdleHint =
+    booted &&
+    listeningOn &&
+    !caption &&
+    !transcript &&
+    !pendingApproval &&
+    !agentBusyWith &&
+    (status === "idle" || status === "listening");
+
+  useEffect(() => {
+    if (!showIdleHint) return;
+    setHintVisible(true);
+    const hide = window.setTimeout(() => setHintVisible(false), 7000);
+    return () => window.clearTimeout(hide);
+  }, [showIdleHint, hintIndex]);
+
+  useEffect(() => {
+    if (!showIdleHint) return;
+    const rotate = window.setInterval(
+      () => setHintIndex((i) => (i + 1) % IDLE_HINTS.length),
+      9500
+    );
+    return () => window.clearInterval(rotate);
+  }, [showIdleHint]);
+
+  /* ---------- Boot screen ---------- */
   if (!booted) {
-    // ---------------- Boot sequence ----------------
     return (
       <div className="fixed inset-0 bg-[#02040a] flex items-center justify-center overflow-hidden">
         <div className="w-full max-w-xl px-8">
@@ -106,10 +159,18 @@ const JarvisCore = ({
                 className="animate-in fade-in slide-in-from-bottom-1 duration-500 flex items-center gap-3"
               >
                 <span className="text-cyan-500/60">›</span>
-                <span className={i === BOOT_LINES.length - 1 ? "text-cyan-200 font-bold tracking-[0.3em] text-base" : ""}>
+                <span
+                  className={
+                    i === BOOT_LINES.length - 1
+                      ? "text-cyan-200 font-bold tracking-[0.3em] text-base"
+                      : ""
+                  }
+                >
                   {line}
                 </span>
-                {i < bootStep && <span className="text-emerald-400 text-xs">✓</span>}
+                {i < bootStep && (
+                  <span className="text-emerald-400 text-xs">✓</span>
+                )}
               </div>
             ))}
           </div>
@@ -118,90 +179,150 @@ const JarvisCore = ({
     );
   }
 
-  const statusLabel: Record<CoreStatus, string> = {
-    idle: listeningOn ? "ESCUTANDO" : "EM ESPERA",
+  /* ---------- Portão de ativação (uma única interação) ---------- */
+  if (!listeningOn) {
+    return (
+      <div className="fixed inset-0 bg-[#02040a] overflow-hidden">
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-[min(92vw,780px)] h-[min(92vw,780px)] max-h-[86vh] opacity-70">
+            <NeuralSphere mode="idle" energy={0} />
+          </div>
+        </div>
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              "radial-gradient(ellipse at center, transparent 30%, rgba(2,4,10,0.75) 78%, #02040a 100%)",
+          }}
+        />
+        <div className="absolute inset-x-0 bottom-[14vh] flex flex-col items-center gap-4 px-6">
+          <button
+            onClick={onToggleListening}
+            className="group relative w-20 h-20 rounded-full border border-cyan-400/50 bg-cyan-500/10 flex items-center justify-center transition-all duration-500 hover:scale-105 hover:border-cyan-300 hover:bg-cyan-500/20 shadow-[0_0_50px_rgba(34,211,238,0.25)] hover:shadow-[0_0_80px_rgba(34,211,238,0.45)]"
+          >
+            <span className="absolute inset-0 rounded-full border border-cyan-400/30 animate-ping" />
+            <Mic className="w-7 h-7 text-cyan-200" />
+          </button>
+          <div className="text-center space-y-1.5">
+            <div className="font-mono text-[11px] tracking-[0.5em] text-cyan-200/90">
+              {isSupported ? "TOQUE PARA DESPERTAR" : "TOQUE PARA MODO DEMO"}
+            </div>
+            <div className="text-xs text-slate-500 font-light">
+              {isSupported
+                ? "O microfone será solicitado — depois basta falar"
+                : "Seu navegador não suporta voz — comandos simulados"}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /* ---------- Núcleo ativo ---------- */
+  const statusLabel: Record<string, string> = {
+    idle: "EM ESPERA",
     listening: "ESCUTANDO",
     command: "CAPTANDO COMANDO",
     processing: "PROCESSANDO",
     speaking: "RESPONDENDO",
-    alert: "ALERTA",
+    alert: "AUTORIZAÇÃO PENDENTE",
     demo: "MODO DEMO",
     requesting: "SOLICITANDO MIC",
-  } as Record<CoreStatus, string>;
+  };
 
   return (
     <div className="fixed inset-0 bg-[#02040a] overflow-hidden">
       {/* Esfera neural central */}
-      <div className="absolute inset-0 flex items-center justify-center">
-        <div className="w-[min(92vw,780px)] h-[min(92vw,780px)] max-h-[86vh]">
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-9">
+        <div className="h-[min(58vh,92vw)] aspect-square shrink-0">
           <NeuralSphere mode={status} energy={micLevel} />
+        </div>
+
+        {/* Status + slot único de texto (legenda / transcrição / dica) */}
+        <div className="flex flex-col items-center gap-3 px-6 min-h-[96px]">
+          <StatusBar label={statusLabel[status] ?? "EM ESPERA"} />
+          {agentBusyWith && (
+            <div className="font-mono text-[10px] tracking-[0.2em] text-cyan-400/50 max-w-md text-center truncate">
+              {agentBusyWith}
+            </div>
+          )}
+
+          {caption ? (
+            <p className="max-w-2xl text-center text-[15px] sm:text-lg leading-relaxed text-cyan-50/90 font-light animate-in fade-in slide-in-from-bottom-2 duration-500">
+              {caption}
+            </p>
+          ) : transcript ? (
+            <p className="max-w-2xl text-center text-sm sm:text-base text-cyan-300/50 italic font-light animate-in fade-in duration-300">
+              “{transcript}”
+            </p>
+          ) : (
+            <p
+              className={`max-w-2xl text-center text-sm text-cyan-300/40 font-light transition-opacity duration-1000 ${
+                hintVisible ? "opacity-100" : "opacity-0"
+              }`}
+            >
+              {IDLE_HINTS[hintIndex]}
+            </p>
+          )}
         </div>
       </div>
 
-      {/* Vinheta escura nas bordas */}
+      {/* Vinheta */}
       <div
         className="pointer-events-none absolute inset-0"
         style={{
           background:
-            "radial-gradient(ellipse at center, transparent 30%, rgba(2,4,10,0.75) 78%, #02040a 100%)",
+            "radial-gradient(ellipse at center, transparent 32%, rgba(2,4,10,0.7) 80%, #02040a 100%)",
         }}
       />
 
-      {/* ------- Topo: status minimalista ------- */}
-      <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-6 sm:px-10 pt-7 pointer-events-none">
+      {/* ------- Topo: identidade + controles que só aparecem no hover ------- */}
+      <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-6 sm:px-10 pt-7 group/ctrl">
         <div className="font-mono text-[11px] tracking-[0.45em] text-cyan-200/70">
           J.A.R.V.I.S.
         </div>
-        <div className="flex items-center gap-2 pointer-events-auto">
+        <div className="flex items-center gap-1.5 opacity-60 sm:opacity-20 sm:hover:opacity-100 hover:!opacity-100 focus-within:!opacity-100 transition-opacity duration-300">
           <button
             onClick={onToggleVoiceOutput}
-            className="font-mono text-[10px] tracking-[0.25em] px-3 py-1.5 rounded-full border border-cyan-500/20 text-cyan-300/60 hover:text-cyan-200 hover:border-cyan-400/50 transition-colors"
+            title={voiceOutput ? "Desativar resposta falada" : "Ativar resposta falada"}
+            className="p-2.5 rounded-full border border-cyan-500/20 text-cyan-300/60 hover:text-cyan-200 hover:border-cyan-400/50 transition-colors"
           >
-            VOZ {voiceOutput ? "ON" : "OFF"}
+            {voiceOutput ? (
+              <Volume2 className="w-3.5 h-3.5" />
+            ) : (
+              <VolumeX className="w-3.5 h-3.5" />
+            )}
+          </button>
+          <button
+            onClick={() => setManualOpen((o) => !o)}
+            title="Digitar comando (tecla /)"
+            className="p-2.5 rounded-full border border-cyan-500/20 text-cyan-300/60 hover:text-cyan-200 hover:border-cyan-400/50 transition-colors"
+          >
+            <Keyboard className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={onOpenConsole}
-            className="flex items-center gap-2 font-mono text-[10px] tracking-[0.25em] px-3 py-1.5 rounded-full border border-cyan-500/20 text-cyan-300/60 hover:text-cyan-200 hover:border-cyan-400/50 transition-colors"
+            title="Abrir console tático"
+            className="p-2.5 rounded-full border border-cyan-500/20 text-cyan-300/60 hover:text-cyan-200 hover:border-cyan-400/50 transition-colors"
           >
-            <Terminal className="w-3 h-3" /> CONSOLE
+            <Terminal className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={onToggleListening}
+            title="Encerrar escuta"
+            className="p-2.5 rounded-full border border-rose-500/25 text-rose-300/70 hover:text-rose-200 hover:border-rose-400/60 transition-colors"
+          >
+            <Power className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
 
-      {/* ------- Status sob a esfera ------- */}
-      <div className="absolute inset-x-0 top-1/2 translate-y-[190px] flex flex-col items-center gap-2 pointer-events-none">
-        <StatusBar label={statusLabel[status] ?? "EM ESPERA"} />
-        {agentBusyWith && (
-          <div className="font-mono text-[10px] tracking-[0.2em] text-cyan-400/50 max-w-md text-center truncate px-6">
-            {agentBusyWith}
-          </div>
-        )}
-      </div>
-
-      {/* ------- Legenda (fala do Jarvis) ------- */}
-      {caption && (
-        <div className="absolute inset-x-0 bottom-32 sm:bottom-36 px-6 flex justify-center pointer-events-none">
-          <p className="max-w-2xl text-center text-[15px] sm:text-lg leading-relaxed text-cyan-50/90 font-light animate-in fade-in slide-in-from-bottom-2 duration-500">
-            {caption}
-          </p>
-        </div>
-      )}
-
-      {/* ------- Transcrição ao vivo (você falando) ------- */}
-      {!caption && transcript && (
-        <div className="absolute inset-x-0 bottom-32 sm:bottom-36 px-6 flex justify-center pointer-events-none">
-          <p className="max-w-2xl text-center text-sm sm:text-base text-cyan-300/50 italic font-light">
-            “{transcript}”
-          </p>
-        </div>
-      )}
-
       {/* ------- Card de aprovação crítica ------- */}
       {pendingApproval && (
-        <div className="absolute inset-x-0 bottom-48 sm:inset-x-auto sm:right-10 sm:top-24 sm:bottom-auto sm:w-[360px] px-4 sm:px-0 flex justify-center sm:block">
+        <div className="absolute inset-x-0 bottom-8 sm:inset-x-auto sm:right-10 sm:top-24 sm:bottom-auto sm:w-[360px] px-4 sm:px-0 flex justify-center sm:block z-20">
           <div className="rounded-2xl border border-amber-400/40 bg-[#0a0f1c]/90 backdrop-blur-xl p-5 shadow-2xl shadow-amber-950/40 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="flex items-center gap-2.5 mb-2">
-              <div className="w-8 h-8 rounded-xl bg-amber-500/15 border border-amber-400/40 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-xl bg-amber-500/15 border border-amber-400/40 flex items-center justify-center shrink-0">
                 <ShieldCheck className="w-4 h-4 text-amber-300" />
               </div>
               <div>
@@ -213,8 +334,11 @@ const JarvisCore = ({
                 </div>
               </div>
             </div>
-            <p className="text-xs text-slate-300/70 leading-relaxed mb-4 line-clamp-3">
+            <p className="text-xs text-slate-300/70 leading-relaxed mb-2 line-clamp-3">
               {pendingApproval.details.actionDescription}
+            </p>
+            <p className="text-[10px] font-mono text-amber-200/50 mb-4 tracking-wider">
+              DIGA “AUTORIZAR” OU “RECUSAR”
             </p>
             <div className="flex gap-2">
               <button
@@ -234,35 +358,9 @@ const JarvisCore = ({
         </div>
       )}
 
-      {/* ------- Barra inferior de comandos ------- */}
-      <div className="absolute bottom-0 left-0 right-0 pb-7 flex flex-col items-center gap-3">
-        <CommandRow />
-        <div className="flex items-center gap-3">
-          <button
-            onClick={onToggleListening}
-            disabled={!isSupported}
-            className={`group relative w-14 h-14 rounded-full flex items-center justify-center border transition-all duration-300 ${
-              listeningOn && isSupported
-                ? "bg-cyan-500/15 border-cyan-400/60 shadow-[0_0_30px_rgba(34,211,238,0.35)]"
-                : "bg-slate-900/60 border-slate-600/40 hover:border-cyan-500/40"
-            } ${!isSupported ? "opacity-50 cursor-not-allowed" : ""}`}
-          >
-            {listeningOn && isSupported ? (
-              <Mic className="w-5 h-5 text-cyan-200" />
-            ) : (
-              <MicOff className="w-5 h-5 text-slate-400 group-hover:text-cyan-300" />
-            )}
-          </button>
-          <button
-            onClick={() => setManualOpen((o) => !o)}
-            className="font-mono text-[10px] tracking-[0.3em] text-cyan-300/50 hover:text-cyan-200 transition-colors px-4 py-2"
-          >
-            DIGITAR COMANDO
-          </button>
-        </div>
-
-        {/* Entrada manual discreta */}
-        {manualOpen && (
+      {/* ------- Entrada manual (palette central discreta) ------- */}
+      {manualOpen && (
+        <div className="absolute inset-x-0 bottom-[18vh] flex justify-center px-6 z-30">
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -277,8 +375,8 @@ const JarvisCore = ({
               autoFocus
               value={manualText}
               onChange={(e) => setManualText(e.target.value)}
-              placeholder="Ex.: status da VPS, auditar firewall, criar endpoint FastAPI..."
-              className="flex-1 bg-slate-900/80 border border-cyan-500/25 rounded-xl px-4 py-2.5 text-sm text-cyan-50 placeholder:text-slate-500 focus:outline-none focus:border-cyan-400/60"
+              placeholder="Comando… (Esc para fechar)"
+              className="flex-1 bg-slate-900/85 backdrop-blur border border-cyan-500/25 rounded-xl px-4 py-2.5 text-sm text-cyan-50 placeholder:text-slate-500 focus:outline-none focus:border-cyan-400/60 shadow-2xl shadow-cyan-950/40"
             />
             <button
               type="submit"
@@ -287,8 +385,8 @@ const JarvisCore = ({
               ENVIAR
             </button>
           </form>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };
