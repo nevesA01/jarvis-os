@@ -52,6 +52,13 @@ interface ConsoleOverlayProps {
   containers: DockerContainer[];
   onRestartContainer: (id: string) => void;
   voice: UseVoiceEngineReturn;
+  localAgent: {
+    status: "checking" | "disconnected" | "paired" | "error";
+    agentName: string;
+    error: string;
+    onPair: (code: string) => void;
+    onDisconnect: () => void;
+  };
 }
 
 type TabId = "chat" | "approvals" | "telemetry" | "memory" | "deploy";
@@ -81,6 +88,7 @@ const ConsoleOverlay = ({
   containers,
   onRestartContainer,
   voice,
+  localAgent,
 }: ConsoleOverlayProps) => {
   const [tab, setTab] = useState<TabId>("chat");
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
@@ -153,7 +161,13 @@ const ConsoleOverlay = ({
 
               {tab === "chat" && (
                 <>
-                  <LocalAgentAccessPanel />
+                  <LocalAgentAccessPanel
+                    status={localAgent.status}
+                    agentName={localAgent.agentName}
+                    error={localAgent.error}
+                    onPair={localAgent.onPair}
+                    onDisconnect={localAgent.onDisconnect}
+                  />
                   <AgentChat
                   messages={messages}
                   isStreaming={streamingMessageId !== null || isThinking}

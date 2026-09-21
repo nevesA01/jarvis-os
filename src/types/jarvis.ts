@@ -53,6 +53,16 @@ export interface ChatMessage {
   approvalRequestId?: string;
 }
 
+export interface LocalAgentAction {
+  action: "read_file" | "write_file" | "list_directory" | "open_application" | "run_command";
+  path?: string;
+  content?: string;
+  application?: string;
+  args?: string[];
+  command?: string;
+  workingDirectory?: string;
+}
+
 export interface ApprovalRequest {
   id: string;
   title: string;
@@ -65,6 +75,7 @@ export interface ApprovalRequest {
   timestamp: string;
   details: {
     command?: string;
+    localAction?: LocalAgentAction;
     fileAffected?: string;
     actionDescription: string;
     riskReason: string;

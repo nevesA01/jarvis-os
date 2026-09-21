@@ -25,9 +25,11 @@ import {
   MemoryItem,
   AgentId,
   DockerContainer,
+  LocalAgentAction,
 } from "@/types/jarvis";
 import { useVoiceEngine } from "@/hooks/useVoiceEngine";
 import { useWakeLock } from "@/hooks/useWakeLock";
+import { useLocalAgent } from "@/hooks/useLocalAgent";
 
 /** Deriva o modo da esfera a partir do estado atual do sistema */
 const sphereModeFrom = (
@@ -73,6 +75,7 @@ const Index = () => {
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
   const [caption, setCaption] = useState<string | null>(null);
   const [agentBusyWith, setAgentBusyWith] = useState<string | null>(null);
+  const localAgent = useLocalAgent();
   const captionTimerRef = useRef<number | null>(null);
   const streamTimerRef = useRef<number | null>(null);
 
@@ -264,14 +267,65 @@ const Index = () => {
       );
 
       const target = approvals.find((a) => a.id === id);
+      if (decision === "approved" && target?.details.localAction) {
+        const localAction = target.details.localAction as LocalAgentAction;
+        void localAgent.execute({
+          requestId: id,
+          ...localAction,
+        }).then(() => {
+          appendMessage({
+            id: `msg-${Date.now()}-local`,
+            sender: "supervisor",
+            senderName: "Supervisor Nexus",
+            content: `✅ Ação local executada pelo agente Windows: **${target.title}**.`,
+            timestamp: nowTime(),
+            reasoningPlan: {
+              intent: "local_agent_execution",
+              delegatedAgent: target.agentId,
+              risk: target.risk,
+              requiresApproval: false,
+              modelUsed: "Jarvis Local Agent",
+              latencyMs: 0,
+              tokens: 0,
+            },
+            toolExecution: {
+              toolName: "Jarvis Windows Agent",
+              target: target.target,
+              status: "success",
+            },
+          });
+        }).catch((error: unknown) => {
+          appendMessage({
+            id: `msg-${Date.now()}-local-error`,
+            sender: "supervisor",
+            senderName: "Supervisor Nexus",
+            content: `⚠️ A autorização foi registrada, mas o agente Windows não executou a ação: **${error instanceof Error ? error.message : "erro desconhecido"}**.`,
+            timestamp: nowTime(),
+            reasoningPlan: {
+              intent: "local_agent_execution",
+              delegatedAgent: target.agentId,
+              risk: target.risk,
+              requiresApproval: false,
+              modelUsed: "Jarvis Local Agent",
+              latencyMs: 0,
+              tokens: 0,
+            },
+            toolExecution: {
+              toolName: "Jarvis Windows Agent",
+              target: target.target,
+              status: "blocked",
+            },
+          });
+        });
+      }
       appendMessage({
         id: `msg-${Date.now()}`,
         sender: "supervisor",
         senderName: "Supervisor Nexus",
-        content:
-          decision === "approved"
-            ? `✅ **Autorização registrada** para o pedido \`${id}\` (${target?.title}).\n\nA interface marcou a solicitação como autorizada, mas a ponte local do Windows ainda não está conectada. Nenhum comando foi executado neste navegador.`
-            : `🚫 **Ação rejeitada pelo operador** (\`${id}\`).\n\nO pedido foi cancelado antes de chegar a qualquer agente local. A justificativa "${note ?? "sem justificativa"}" foi registrada na memória episódica.`,
+      content:
+        decision === "approved"
+          ? `✅ **Autorização registrada** para o pedido \`${id}\` (${target?.title}).\n\n${target?.details.localAction ? "O pedido foi enviado ao agente local pareado." : "Este pedido é simulado e não possui uma ação local vinculada."}`
+          : `🚫 **Ação rejeitada pelo operador** (\`${id}\`).\n\nO pedido foi cancelado antes de chegar a qualquer agente local. A justificativa "${note ?? "sem justificativa"}" foi registrada na memória episódica.`,
         timestamp: nowTime(),
         reasoningPlan: {
           intent: "human_in_the_loop_review",
@@ -412,6 +466,13 @@ const Index = () => {
         containers={containers}
         onRestartContainer={handleRestartContainer}
         voice={voice}
+        localAgent={{
+          status: localAgent.status,
+          agentName: localAgent.agentName,
+          error: localAgent.error,
+          onPair: (code) => void localAgent.pair(code),
+          onDisconnect: () => void localAgent.disconnect(),
+        }}
       />
     </div>
   );

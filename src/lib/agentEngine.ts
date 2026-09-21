@@ -163,6 +163,10 @@ export const buildAgentResponse = (text: string, analysis: IntentAnalysis): Agen
         timestamp: nowTime,
         details: {
           command: text,
+          localAction:
+            /\b(listar|mostre|mostrar|ver|conteúdo|conteudo)\b/i.test(text)
+              ? { action: "list_directory", path: "." }
+              : { action: "run_command", command: text },
           actionDescription: `O Agente Local do Windows prepararia esta ação: "${text}"`,
           riskReason:
             "A ação pode ler ou alterar recursos do computador. A autorização humana é obrigatória antes de encaminhar qualquer pedido à ponte local.",
