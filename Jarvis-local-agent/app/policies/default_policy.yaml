@@ -1,0 +1,42 @@
+version: phase-a-2025-01
+platform: windows-11
+levels:
+  L0:
+    tools: []
+    approval_required: false
+  L1:
+    tools: []
+    approval_required: false
+  L2:
+    tools: []
+    approval_required: true
+  L3:
+    tools: []
+    approval_required: true
+  L4:
+    tools: []
+    blocked: true
+limits:
+  max_job_ttl_seconds: 300
+  max_steps: 0
+  max_tabs: 0
+  max_downloads: 0
+  max_payload_bytes: 65536
+  max_attempts: 1
+blocked_actions:
+  - Browser.execute_javascript
+  - Browser.open_any_domain
+  - Browser.upload_any_file
+  - Browser.submit_without_approval
+  - Browser.click_coordinates_unrestricted
+  - Shell.execute
+  - PowerShell.execute
+  - Cmd.execute
+  - Script.execute
+  - System.install_program
+  - System.change_permissions
+  - Filesystem.delete
+  - Filesystem.overwrite
+allowed_tools: []
+allowed_domains: []
+allowed_profiles: []
