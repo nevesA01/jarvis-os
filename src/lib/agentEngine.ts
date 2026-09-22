@@ -1,4 +1,5 @@
-import { ChatMessage, ApprovalRequest } from "@/types/jarvis";
+import { ChatMessage, ApprovalRequest, AgentId } from "@/types/jarvis";
+import { routeSkills, type SkillRoute } from "@/lib/skillRouter";
 
 export interface AgentResponseDraft {
   sender: ChatMessage["sender"];
@@ -12,13 +13,23 @@ export interface AgentResponseDraft {
 
 export interface IntentAnalysis {
   intent: string;
-  targetAgent: ChatMessage["sender"];
+  targetAgent: AgentId;
   agentName: string;
   risk: "low" | "medium" | "high";
   requiresApproval: boolean;
   modelUsed: string;
   isDestructive: boolean;
+  skillRoutes?: SkillRoute[];
 }
+
+export const attachSkillRoutes = (
+  text: string,
+  analysis: IntentAnalysis,
+  preferredAgent?: AgentId | null
+): IntentAnalysis => ({
+  ...analysis,
+  skillRoutes: routeSkills(text, preferredAgent || analysis.targetAgent),
+});
 
 const DESTROY_KEYWORDS = [
   "delete", "prune", "apagar", "rm -rf", "drop table", "formatar", "ufw allow",

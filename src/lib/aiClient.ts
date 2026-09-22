@@ -20,7 +20,11 @@ export interface AiChatMessage {
 export const askConfiguredAi = async (
   settings: AiSettings,
   messages: AiChatMessage[],
-  context?: { memories?: Array<{ title: string; content: string; tags: string[] }>; agent?: string }
+  context?: {
+    memories?: Array<{ title: string; content: string; tags: string[] }>;
+    agent?: string;
+    skills?: Array<{ id: string; name: string; category: string; risk: string; reason: string }>;
+  }
 ): Promise<{ content: string; model: string }> => {
   const provider = settings.providers.find(
     (item) => item.id === settings.activeProviderId && item.enabled && item.model.trim() && item.baseUrl.trim()
@@ -28,7 +32,10 @@ export const askConfiguredAi = async (
   if (!provider) throw new Error("Nenhuma IA ativa foi configurada");
 
   const memoryContext = context?.memories?.slice(0, 5).map((memory) => `[${memory.title}] ${memory.content} (tags: ${memory.tags.join(", ")})`).join("\n") || "Nenhuma memória relevante encontrada.";
-  const enrichedSystemPrompt = `${settings.systemPrompt}\n\nAgente selecionado: ${context?.agent || "supervisor"}.\nMemória recuperada (use apenas como contexto, não invente fatos):\n${memoryContext}`;
+  const skillContext = context?.skills?.length
+    ? context.skills.map((skill) => `[${skill.id}] ${skill.name} · ${skill.category} · risco ${skill.risk} · ${skill.reason}`).join("\n")
+    : "Nenhuma skill habilitada correspondeu diretamente.";
+  const enrichedSystemPrompt = `${settings.systemPrompt}\n\nAgente selecionado: ${context?.agent || "supervisor"}.\nSkills habilitadas selecionadas para este pedido (use como playbooks, não como permissões):\n${skillContext}\nMemória recuperada (use apenas como contexto, não invente fatos):\n${memoryContext}`;
   const response = await fetch("/api/ai/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

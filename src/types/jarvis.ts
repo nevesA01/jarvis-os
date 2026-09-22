@@ -42,6 +42,13 @@ export interface ChatMessage {
     modelUsed: string;
     latencyMs: number;
     tokens: number;
+    selectedSkills?: Array<{
+      id: string;
+      name: string;
+      category: string;
+      risk: "S0" | "S1" | "S2" | "S3" | "S4";
+      reason: string;
+    }>;
   };
   toolExecution?: {
     toolName: string;

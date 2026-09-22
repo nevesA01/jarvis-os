@@ -3,6 +3,7 @@ import JarvisCore, { CoreStatus } from "@/components/visuals/JarvisCore";
 import ConsoleOverlay from "@/components/console/ConsoleOverlay";
 import {
   analyzeIntent,
+  attachSkillRoutes,
   buildAgentResponse,
   type AgentResponseDraft,
 } from "@/lib/agentEngine";
@@ -168,6 +169,7 @@ const Index = () => {
       setAgentBusyWith("Pensando...");
 
       const configuredProvider = activeProvider(aiSettings);
+      const skillRoutes = routeSkills(text, forceAgent || "supervisor");
       const memoryRequest = text.match(/^\s*(?:memorize|guarde|lembre|anote|remember)\s*(?:que|:)?\s+(.+)/i);
       if (memoryRequest) {
         const memory = createLearnedMemory(memoryRequest[1].trim(), ["preferência", viaVoice ? "voz" : "manual"], "Memória ensinada pelo operador");
