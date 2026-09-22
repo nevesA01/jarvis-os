@@ -132,6 +132,53 @@ export const analyzeIntent = (text: string): IntentAnalysis => {
   };
 };
 
+const extractQuotedOrTrailingValue = (text: string, pattern: RegExp, fallback: string) => {
+  const match = text.match(pattern);
+  return match?.[1]?.trim() || fallback;
+};
+
+const buildLocalAction = (text: string) => {
+  const normalized = text.toLowerCase();
+  const path = extractQuotedOrTrailingValue(text, /(?:arquivo|pasta|diret[óo]rio)\s+["“”']?([^"“”']+?)["“”']?(?:\s|$)/i, ".");
+
+  if (/\b(list(ar|e)|mostr(ar|e)|exibir|conte[uú]do)\b/.test(normalized) && /arquivo|pasta|diret[óo]rio|download|desktop/.test(normalized)) {
+    return { action: "list_directory" as const, path };
+  }
+
+  if (/\b(ler|leia|abrir o arquivo|mostrar o arquivo)\b/.test(normalized)) {
+    return { action: "read_file" as const, path };
+  }
+
+  const openMatch = normalized.match(/\b(?:abrir|abra|iniciar|inicie|fechar|feche)\s+(?:o|a)?\s*([a-z0-9 ._-]+)/i);
+  if (openMatch && /\b(abrir|abra|iniciar|inicie)\b/.test(normalized)) {
+    const applicationName = openMatch[1].trim().replace(/\\s+(por favor|agora)$/i, "");
+    const applications: Record<string, string> = {
+      chrome: "chrome.exe",
+      "google chrome": "chrome.exe",
+      edge: "msedge.exe",
+      "microsoft edge": "msedge.exe",
+      notepad: "notepad.exe",
+      bloco: "notepad.exe",
+      calculadora: "calc.exe",
+      calculator: "calc.exe",
+      explorer: "explorer.exe",
+      explorador: "explorer.exe",
+      vscode: "code.cmd",
+      "visual studio code": "code.cmd",
+      discord: "Discord.exe",
+    };
+    return { action: "open_application" as const, application: applications[applicationName] || applicationName };
+  }
+
+  const writeMatch = text.match(/(?:crie|criar|escreva|escrever|salve|salvar)\s+(?:um\s+)?arquivo\s+["“”']?([^"“”']+?)["“”']?\s+(?:com|contendo)\s+([\s\S]+)/i);
+  if (writeMatch) {
+    return { action: "write_file" as const, path: writeMatch[1].trim(), content: writeMatch[2].trim() };
+  }
+
+  const command = text.replace(/^\s*(?:jarvis[,:]?\s*)?(?:execute|executa|executar|rode|rodar|run)\s*(?:o\s+comando\s*)?/i, "").trim();
+  return { action: "run_command" as const, command: command || text };
+};
+
 export const buildAgentResponse = (text: string, analysis: IntentAnalysis): AgentResponseDraft => {
   const nowTime = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 
@@ -163,10 +210,7 @@ export const buildAgentResponse = (text: string, analysis: IntentAnalysis): Agen
         timestamp: nowTime,
         details: {
           command: text,
-          localAction:
-            /\b(listar|mostre|mostrar|ver|conteúdo|conteudo)\b/i.test(text)
-              ? { action: "list_directory", path: "." }
-              : { action: "run_command", command: text },
+          localAction: buildLocalAction(text),
           actionDescription: `O Agente Local do Windows prepararia esta ação: "${text}"`,
           riskReason:
             "A ação pode ler ou alterar recursos do computador. A autorização humana é obrigatória antes de encaminhar qualquer pedido à ponte local.",
@@ -273,7 +317,7 @@ export const buildAgentResponse = (text: string, analysis: IntentAnalysis): Agen
   return {
     sender: "supervisor",
     senderName: "Supervisor Nexus",
-    content: `Não encontrei uma ação específica para isso. Pode reformular a pergunta?`,
+    content: `Entendi a pergunta, mas preciso de um pouco mais de contexto para agir com segurança.\n\nTente incluir:\n- **Objetivo:** o que você quer obter?\n- **Alvo:** qual arquivo, aplicativo, pasta ou serviço?\n- **Resultado esperado:** como devo saber que terminou?\n\nExemplos: “abra o Notepad”, “liste os arquivos de Downloads” ou “crie um arquivo chamado notas.txt na Área de Trabalho”. Se uma IA estiver conectada na aba **IAs**, também posso responder perguntas abertas com ela.`,
     reasoningPlan: {
       intent: analysis.intent,
       delegatedAgent: "supervisor",

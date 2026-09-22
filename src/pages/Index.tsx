@@ -30,6 +30,7 @@ import {
 import { useVoiceEngine } from "@/hooks/useVoiceEngine";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import { useLocalAgent } from "@/hooks/useLocalAgent";
+import { askConfiguredAi, activeProvider, loadAiSettings } from "@/lib/aiClient";
 
 /** Deriva o modo da esfera a partir do estado atual do sistema */
 const sphereModeFrom = (
@@ -75,6 +76,7 @@ const Index = () => {
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
   const [caption, setCaption] = useState<string | null>(null);
   const [agentBusyWith, setAgentBusyWith] = useState<string | null>(null);
+  const [aiSettings, setAiSettings] = useState(loadAiSettings);
   const localAgent = useLocalAgent();
   const captionTimerRef = useRef<number | null>(null);
   const streamTimerRef = useRef<number | null>(null);
@@ -160,6 +162,31 @@ const Index = () => {
       setIsThinking(true);
       setAgentBusyWith("Pensando...");
 
+      const configuredProvider = activeProvider(aiSettings);
+      if (configuredProvider && !forceAgent && !isWeatherQuestion(text)) {
+        try {
+          const recentMessages = [...messages, userMsg].filter((message) => message.sender === "user" || message.sender === "supervisor").slice(-12).map((message) => ({ role: message.sender === "user" ? "user" as const : "assistant" as const, content: message.content }));
+          const answer = await askConfiguredAi(aiSettings, recentMessages);
+          streamAssistantMessage({
+            sender: "supervisor",
+            senderName: `Jarvis · ${configuredProvider.name}`,
+            content: answer.content,
+            reasoningPlan: {
+              intent: "configured_ai_response",
+              delegatedAgent: "supervisor",
+              risk: "low",
+              requiresApproval: false,
+              modelUsed: answer.model,
+              latencyMs: 0,
+              tokens: answer.content.length,
+            },
+          }, viaVoice);
+          return;
+        } catch (error) {
+          setAgentBusyWith(`Fallback local: ${error instanceof Error ? error.message : "IA indisponível"}`);
+        }
+      }
+
       if (isWeatherQuestion(text)) {
         const city = extractWeatherCity(text) || "Manaus";
         try {
@@ -206,7 +233,7 @@ const Index = () => {
         streamAssistantMessage(buildAgentResponse(text, analysis), viaVoice);
       }, 350);
     },
-    [appendMessage, streamAssistantMessage]
+    [aiSettings, appendMessage, messages, streamAssistantMessage]
   );
 
   // ===================== Voice =====================
@@ -473,6 +500,7 @@ const Index = () => {
           onPair: (code) => void localAgent.pair(code),
           onDisconnect: () => void localAgent.disconnect(),
         }}
+        onAiSettingsChange={setAiSettings}
       />
     </div>
   );

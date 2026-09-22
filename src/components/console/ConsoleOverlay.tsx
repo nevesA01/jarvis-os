@@ -5,6 +5,7 @@ import { LocalAgentAccessPanel } from "@/components/access/LocalAgentAccessPanel
 import { VpsTelemetryView } from "@/components/telemetry/VpsTelemetry";
 import { MemoryManager } from "@/components/memory/MemoryManager";
 import { VpsDeployHub } from "@/components/deploy/VpsDeployHub";
+import { AiSettingsPanel } from "@/components/settings/AiSettingsPanel";
 import { JarvisCoreLogo } from "@/components/visuals/JarvisVisuals";
 import {
   JARVIS_AGENTS,
@@ -20,6 +21,7 @@ import {
   DockerContainer,
 } from "@/types/jarvis";
 import { UseVoiceEngineReturn } from "@/hooks/useVoiceEngine";
+import { AiSettings } from "@/types/ai";
 import {
   MessageSquare,
   ShieldCheck,
@@ -27,6 +29,7 @@ import {
   Brain,
   Rocket,
   X,
+  Settings2,
 } from "lucide-react";
 
 interface ConsoleOverlayProps {
@@ -59,9 +62,10 @@ interface ConsoleOverlayProps {
     onPair: (code: string) => void;
     onDisconnect: () => void;
   };
+  onAiSettingsChange: (settings: AiSettings) => void;
 }
 
-type TabId = "chat" | "approvals" | "telemetry" | "memory" | "deploy";
+type TabId = "chat" | "approvals" | "telemetry" | "memory" | "deploy" | "settings";
 
 const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
   { id: "chat", label: "Canal Neural", icon: <MessageSquare className="w-4 h-4" /> },
@@ -69,6 +73,7 @@ const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
   { id: "telemetry", label: "Telemetria", icon: <Activity className="w-4 h-4" /> },
   { id: "memory", label: "Memória", icon: <Brain className="w-4 h-4" /> },
   { id: "deploy", label: "Deploy", icon: <Rocket className="w-4 h-4" /> },
+  { id: "settings", label: "IAs", icon: <Settings2 className="w-4 h-4" /> },
 ];
 
 const ConsoleOverlay = ({
@@ -89,6 +94,7 @@ const ConsoleOverlay = ({
   onRestartContainer,
   voice,
   localAgent,
+  onAiSettingsChange,
 }: ConsoleOverlayProps) => {
   const [tab, setTab] = useState<TabId>("chat");
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
@@ -204,6 +210,7 @@ const ConsoleOverlay = ({
                 />
               )}
               {tab === "deploy" && <VpsDeployHub />}
+              {tab === "settings" && <AiSettingsPanel onSettingsChange={onAiSettingsChange} />}
             </div>
           </div>
         </div>

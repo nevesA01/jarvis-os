@@ -41,8 +41,9 @@ interface SpeechRecognitionLike extends EventTarget {
 
 const WAKE_WORDS = ["jarvis", "jervis", "jarves", "jarvic", "jar vis"];
 const WAKE_REGEX = new RegExp(`\\b(${WAKE_WORDS.join("|")})\\b`, "i");
-const SILENCE_MS = 5000;
+const SILENCE_MS = 2600;
 const RESTART_DELAY_MS = 180;
+const WAKE_WINDOW_MS = 9000;
 const DEMO_EMIT_MS = 14000;
 
 const DEMO_COMMANDS = [
@@ -136,6 +137,7 @@ export const useVoiceEngine = (onCommand: (text: string) => void): UseVoiceEngin
   const speakTokenRef = useRef(0);
   const voicesRef = useRef<SpeechSynthesisVoice[]>([]);
   const commandBufferRef = useRef("");
+  const wakeDetectedAtRef = useRef<number | null>(null);
   const demoIndexRef = useRef(0);
   const demoTimersRef = useRef<number[]>([]);
 
