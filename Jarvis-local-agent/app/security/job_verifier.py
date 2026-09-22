@@ -21,10 +21,12 @@ class JobVerifier:
         nonce_store: NonceStore,
         policy: LocalPolicy,
         signature_payload: Callable[[Job], dict] | None = None,
+        clock_skew_seconds: int = 30,
     ) -> None:
         self.public_key = public_key
         self.nonce_store = nonce_store
         self.policy = policy
+        self.clock_skew_seconds = clock_skew_seconds
         self.signature_payload = signature_payload or (lambda job: job.model_dump(mode="json", exclude={"signature"}))
 
     def verify(self, job: Job, context: ValidationContext, approval: Approval | None = None) -> None:
@@ -33,7 +35,7 @@ class JobVerifier:
             raise JobRejected("kill_switch_enabled")
         if job.device_id != context.local_device_id:
             raise JobRejected("device_mismatch")
-        if job.issued_at.timestamp() > now.timestamp() + 30:
+        if job.issued_at.timestamp() > now.timestamp() + self.clock_skew_seconds:
             raise JobRejected("issued_at_in_future")
         if job.expires_at <= now:
             raise JobRejected("job_expired")
@@ -41,11 +43,11 @@ class JobVerifier:
             raise JobRejected("action_hash_mismatch")
         if not verify_payload(self.public_key, self.signature_payload(job), job.signature):
             raise JobRejected("invalid_signature")
-        if not self.nonce_store.claim(job.nonce, job.expires_at):
-            raise JobRejected("replayed_nonce")
         allowed, reason = self.policy.allows(job)
         if not allowed:
             raise JobRejected(reason)
+        if not self.nonce_store.claim(job.nonce, job.expires_at):
+            raise JobRejected("replayed_nonce")
         if job.permission_level.value >= 2:
             if approval is None:
                 raise JobRejected("approval_required")

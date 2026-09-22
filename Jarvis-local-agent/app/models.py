@@ -29,8 +29,8 @@ class Job(BaseModel):
     user_id: str = Field(min_length=1, max_length=128)
     device_id: str = Field(min_length=1, max_length=128)
     task_id: str = Field(min_length=1, max_length=128)
-    action_type: str = Field(min_length=1, max_length=128, pattern=r"^[a-z][a-z0-9_.-]+$")
-    tool_id: str = Field(min_length=1, max_length=128, pattern=r"^[a-z][a-z0-9_.-]+$")
+    action_type: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z][A-Za-z0-9_.-]+$")
+    tool_id: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z][A-Za-z0-9_.-]+$")
     validated_arguments: dict[str, Any] = Field(default_factory=dict)
     action_hash: str = Field(min_length=64, max_length=64, pattern=r"^[a-f0-9]{64}$")
     permission_level: PermissionLevel

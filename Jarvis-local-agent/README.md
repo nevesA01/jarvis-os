@@ -1,51 +1,69 @@
-# Jarvis Local Agent — Fase A
+# Jarvis Local Agent — Windows 11
 
-Núcleo seguro para Windows 11, sem automação real. Esta etapa prepara validação local, política deny-by-default, pareamento simulado, auditoria sanitizada e controles de cancelamento.
+Agente local de menor privilégio para o Jarvis. O componente usa **somente conexão de saída WSS** quando configurado, não abre portas no computador e não fornece shell, PowerShell, CMD, scripts livres, Docker socket, SSH, banco local, gerenciador de senhas ou automação financeira.
 
-## Estado honesto
+## O que está funcionando no código
 
-### Código implementado
+- Identidade de dispositivo com chave Ed25519 e proteção da chave privada pelo DPAPI do Windows.
+- Jobs Pydantic com campos obrigatórios, assinatura, nonce, expiração, dispositivo, risco, ferramenta e `action_hash`.
+- Política local YAML com prioridade sobre pedidos remotos.
+- WSS de saída com validação TLS, heartbeat e reconexão exponencial.
+- Perfil Playwright persistente isolado `Jarvis-Automation`.
+- Allowlist de domínios e esquemas `http`/`https`; redirects são revalidados.
+- Leitura de título, URL, texto visível, links seguros, busca na página e screenshot.
+- Preenchimento de campos sem submit.
+- Preview de formulário.
+- Submit ainda bloqueado por padrão, sem domínio de teste configurado.
+- Workspace exclusiva `~/JarvisWorkspace/` com `Inbox`, `Drafts`, `Exports`, `Downloads-quarantine` e `Projects-approved`.
+- Leitura controlada, criação sem overwrite em drafts/exports e quarentena de downloads não executáveis.
+- Bloqueio de traversal, symlinks, `.env`, credenciais, cookies, histórico, executáveis e exclusão.
+- Janela nativa Tk para aprovação L3 com preview, hash e expiração curta; aprovação por voz não é aceita.
+- Auditoria local sanitizada e kill switch.
+- Detecção de conteúdo suspeito de prompt injection como dado não confiável.
 
-- Modelos Pydantic fechados para jobs, aprovações, auditoria e contexto.
-- Assinatura Ed25519 e hash canônico de ação.
-- Validação de dispositivo, assinatura, timestamp, expiração, nonce, política local e aprovação.
-- Política YAML local com ferramentas vazias e L4 bloqueado.
-- Pareamento simulado com código de uso único armazenado somente como hash.
-- Armazenamento persistente de nonces com escrita atômica.
-- Redação de tokens, cookies, senhas, autorização, 2FA e possíveis cartões nos logs.
-- Detecção de padrões básicos de prompt injection em conteúdo não confiável.
-- Kill switch, cancelamento e checkpoints.
-- Roteador deliberadamente sem ferramentas executáveis.
-- Testes automatizados dos controles da Fase A.
+## Limites deliberados
 
-### Ambiente configurado
-
-- Alvo principal: Windows 11.
-- Python 3.11+.
-- O componente não cria servidor HTTP, WebSocket, listener local ou porta de entrada.
-- O frontend atual do Jarvis ainda possui uma integração legada que tenta `127.0.0.1:3210`; ela não é ativada por esta Fase A e não deve ser tratada como agente validado.
-
-### Não validado em dispositivo real
-
-- Instalação em Windows 11 real.
-- Pareamento com a VPS.
-- WSS de saída.
-- Janela nativa de aprovação.
-- Playwright ou navegador isolado.
-- Filesystem workspace.
-- Reconexão, heartbeat e revogação remota.
+- L4 permanece desabilitado.
+- Nenhum domínio é permitido por padrão. O operador precisa editar a política local e incluir apenas domínios de teste explicitamente autorizados.
+- Não há upload implementado.
+- Não há compra, pagamento, transferência, login automatizado, criação de conta, alteração de permissões ou aceite de termos.
+- Não há Browser.execute_javascript.
+- Não existe servidor HTTP local nem listener de entrada.
+- A conexão real só funciona quando a VPS fornecer endpoint WSS, token curto e chave pública de assinatura compatíveis com o protocolo.
 
 ## Instalação no Windows 11
 
-Abra um terminal Python em `Jarvis-local-agent` e crie um ambiente virtual:
+Pré-requisitos:
+
+- Windows 11.
+- Python 3.11+.
+- Microsoft Edge/Chromium compatível ou Chromium gerenciado pelo Playwright.
+- Endpoint WSS da VPS e fluxo de pareamento já configurados.
+
+Em `Jarvis-local-agent`, crie o ambiente e instale:
 
 ```text
 py -3.11 -m venv .venv
 .venv\\Scripts\\python -m pip install --upgrade pip
-.venv\\Scripts\\python -m pip install -r requirements.txt
+.venv\\Scripts\\python -m pip install -e ".[test]"
+.venv\\Scripts\\python -m playwright install chromium
 ```
 
-Os comandos acima são apenas instruções de instalação documentadas; a Fase A não executa shell, PowerShell, CMD ou scripts livres por meio do agente.
+Configure as variáveis do `.env.example` no ambiente do usuário. Nunca salve tokens reais ou chaves privadas no repositório.
+
+Para iniciar o runtime configurado:
+
+```text
+.venv\\Scripts\\python -m app.main
+```
+
+O runtime recusa qualquer URL que não seja `wss://`. Se `JARVIS_VPS_WSS_URL` ou `JARVIS_ACCESS_TOKEN` não forem configurados, ele não conecta.
+
+## Política e allowlist
+
+Edite `app/policies/default_policy.yaml` somente com revisão humana. Para testes, `allowed_domains` deve conter domínios sem dados sensíveis, por exemplo `example.test` ou um domínio interno de laboratório. Não inclua banco, e-mail principal, redes sociais, pagamentos ou contas administrativas.
+
+A política padrão permite apenas as ferramentas fechadas listadas no YAML. A política do computador sempre prevalece sobre o job remoto.
 
 ## Testes
 
@@ -53,20 +71,28 @@ Os comandos acima são apenas instruções de instalação documentadas; a Fase 
 .venv\\Scripts\\python -m pytest
 ```
 
-## Política de segurança
+Os testes cobrem assinatura inválida, expiração, replay, dispositivo incorreto, hash alterado, aprovação expirada, kill switch, URLs não permitidas, esquema `javascript:`, redirects, traversal, symlinks, extensões executáveis, download inseguro, overwrite e prompt injection.
 
-A política padrão em `app/policies/default_policy.yaml` é local e tem precedência sobre qualquer pedido remoto. Na Fase A:
+## Estado de validação
 
-- nenhuma ferramenta é allowlisted;
-- L4 está bloqueado;
-- não existem domínios permitidos;
-- não há abas, downloads ou passos de automação;
-- shell, PowerShell, CMD, scripts, upload, submit, instalação, alteração de permissões, exclusão e sobrescrita estão bloqueados.
+### Implementado no código
+
+Os módulos e testes estão no repositório.
+
+### Ambiente configurado
+
+O projeto está preparado para Windows 11, mas o endpoint WSS, token, chave pública da VPS e allowlist de domínio ainda dependem da infraestrutura real.
+
+### Validado em dispositivo real
+
+Ainda não validado neste ambiente: instalação real no Windows 11, navegador Chromium, DPAPI, janela nativa, endpoint WSS e pareamento com a VPS. Isso não deve ser reportado como concluído sem execução e evidência no equipamento real.
 
 ## Rollback
 
-Remova o diretório `Jarvis-local-agent` e qualquer diretório de dados definido por `JARVIS_AGENT_DATA_DIR`. Nenhum arquivo do frontend, backend ou sistema operacional é alterado por este componente.
+1. Encerre o processo do agente.
+2. Remova o diretório `Jarvis-local-agent`.
+3. Remova o diretório de dados configurado em `JARVIS_AGENT_DATA_DIR`.
+4. Exclua `JarvisWorkspace` somente após revisar os arquivos gerados.
+5. Revogue o dispositivo e o token no painel da VPS.
 
-## Próxima etapa
-
-A Fase B só deve ser iniciada após revisão da política e validação dos testes. Ela adicionará Playwright em perfil isolado, ainda sem preenchimento, upload ou submit.
+O componente não modifica o frontend, não instala serviço do Windows e não cria uma porta de entrada.

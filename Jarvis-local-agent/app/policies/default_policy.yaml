@@ -1,34 +1,63 @@
-version: phase-a-2025-01
+version: phase-a-e-2025-01
 platform: windows-11
 levels:
   L0:
     tools: []
     approval_required: false
   L1:
-    tools: []
+    tools:
+      - System.get_info
+      - Files.list_workspace
+      - Files.read_allowed
+      - Browser.open_url
+      - Browser.read_page
+      - Browser.list_links
+      - Browser.search_page
+      - Browser.take_screenshot
     approval_required: false
   L2:
-    tools: []
-    approval_required: true
+    tools:
+      - Files.create_draft
+      - Files.create_export
+      - Files.quarantine_download
+      - Browser.fill_field
+      - Browser.preview_form
+    approval_required: false
   L3:
-    tools: []
+    tools:
+      - Browser.request_submit
     approval_required: true
   L4:
     tools: []
     blocked: true
 limits:
   max_job_ttl_seconds: 300
-  max_steps: 0
-  max_tabs: 0
-  max_downloads: 0
+  max_steps: 20
+  max_tabs: 3
+  max_downloads: 3
   max_payload_bytes: 65536
-  max_attempts: 1
+  max_file_bytes: 10485760
+  max_attempts: 2
+  max_page_text_bytes: 200000
+browser:
+  profile_name: Jarvis-Automation
+  headless: false
+  download_directory: Downloads-quarantine
+  upload_enabled: false
+  allowed_schemes:
+    - http
+    - https
 blocked_actions:
   - Browser.execute_javascript
   - Browser.open_any_domain
   - Browser.upload_any_file
   - Browser.submit_without_approval
   - Browser.click_coordinates_unrestricted
+  - Browser.purchase
+  - Browser.payment
+  - Browser.transfer
+  - Browser.create_account
+  - Browser.change_permissions
   - Shell.execute
   - PowerShell.execute
   - Cmd.execute
@@ -37,6 +66,22 @@ blocked_actions:
   - System.change_permissions
   - Filesystem.delete
   - Filesystem.overwrite
-allowed_tools: []
+  - Filesystem.execute_download
+allowed_tools:
+  - System.get_info
+  - Files.list_workspace
+  - Files.read_allowed
+  - Files.create_draft
+  - Files.create_export
+  - Files.quarantine_download
+  - Browser.open_url
+  - Browser.read_page
+  - Browser.list_links
+  - Browser.search_page
+  - Browser.take_screenshot
+  - Browser.fill_field
+  - Browser.preview_form
+  - Browser.request_submit
 allowed_domains: []
-allowed_profiles: []
+allowed_profiles:
+  - Jarvis-Automation
