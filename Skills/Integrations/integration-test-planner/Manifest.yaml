@@ -1,0 +1,32 @@
+Id: integration-test-planner
+Name: Integration Test Planner
+Version: 1.0.0
+Description: fornecer um playbook de integration test planner.
+Category: Integrations
+Risk_level: S0
+Status: enabled
+Owner: Jarvis V3
+Allowed_agents: [supervisor]
+Allowed_roles: [operator]
+Required_tools: []
+Optional_tools: []
+External_integrations: [none]
+Network_access: false
+Filesystem_access: none
+Data_classification: user-provided-context
+Requires_user_confirmation: false
+Requires_transitional_approval: false
+Requires_reauthentication: false
+Supports_dry_run: true
+Supports_rollback: false
+Max_runtime_seconds: 30
+Max_input_size: 12000
+Max_output_size: 12000
+Rate_limit: 20/hour/user
+Quality_checks: [schema_valid, actionable_output, uncertainty_explicit, no_unsupported_claims]
+Security_checks: [prompt_injection_boundary, no_secret_access, no_undeclared_tools, untrusted_content_is_data]
+Created_at: 2026-09-22
+Updated_at: 2026-09-22
+License: Proprietary-Jarvis-V3
+Source: internal-playbook
+Review_status: approved

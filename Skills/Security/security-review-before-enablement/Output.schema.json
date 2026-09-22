@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SecurityReviewBeforeEnablementOutput",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["approved_for_installation", "risk_level", "required_controls", "permissions_requested", "data_accessed", "risks", "mitigations", "missing_information", "approval_required"],
+  "properties": {
+    "approved_for_installation": { "type": "boolean", "const": false },
+    "risk_level": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+    "required_controls": { "type": "array", "items": { "type": "string", "maxLength": 1000 }, "maxItems": 100 },
+    "permissions_requested": { "type": "array", "items": { "type": "string", "maxLength": 1000 }, "maxItems": 100 },
+    "data_accessed": { "type": "array", "items": { "type": "string", "maxLength": 1000 }, "maxItems": 100 },
+    "risks": { "type": "array", "items": { "type": "string", "maxLength": 1000 }, "maxItems": 100 },
+    "mitigations": { "type": "array", "items": { "type": "string", "maxLength": 1000 }, "maxItems": 100 },
+    "missing_information": { "type": "array", "items": { "type": "string", "maxLength": 1000 }, "maxItems": 100 },
+    "approval_required": { "type": "boolean", "const": true }
+  }
+}

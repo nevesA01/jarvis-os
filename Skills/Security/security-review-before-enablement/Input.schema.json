@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SecurityReviewBeforeEnablementInput",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["artifact"],
+  "properties": {
+    "artifact": { "type": "string", "minLength": 1, "maxLength": 12000 },
+    "source": { "type": "string", "maxLength": 2000 },
+    "maintainer": { "type": "string", "maxLength": 1000 },
+    "version": { "type": "string", "maxLength": 200 },
+    "license": { "type": "string", "maxLength": 500 },
+    "integrity_hash": { "type": "string", "maxLength": 200 },
+    "dependencies": { "type": "array", "maxItems": 100, "items": { "type": "string", "maxLength": 500 } },
+    "permissions": { "type": "array", "maxItems": 100, "items": { "type": "string", "maxLength": 500 } },
+    "exposed_tools": { "type": "array", "maxItems": 100, "items": { "type": "string", "maxLength": 500 } },
+    "data_access": { "type": "array", "maxItems": 100, "items": { "type": "string", "maxLength": 500 } },
+    "oauth_scopes": { "type": "array", "maxItems": 100, "items": { "type": "string", "maxLength": 500 } },
+    "tests": { "type": "array", "maxItems": 100, "items": { "type": "string", "maxLength": 500 } },
+    "untrusted_content": { "type": "string", "maxLength": 20000 },
+    "dry_run": { "type": "boolean", "const": true }
+  }
+}

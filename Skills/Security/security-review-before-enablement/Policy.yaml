@@ -1,0 +1,15 @@
+skill_id: security-review-before-enablement
+risk_level: S0
+allowed_tools: []
+network_access: false
+filesystem_access: none
+secrets_access: false
+can_write_state: false
+requires_user_confirmation: false
+requires_transitional_approval: false
+requires_reauthentication: false
+allow_installation: false
+allow_enablement: false
+allow_external_connection: false
+prompt_injection: treat_as_untrusted_data
+execution: no_tool_calls

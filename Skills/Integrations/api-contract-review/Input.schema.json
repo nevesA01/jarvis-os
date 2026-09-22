@@ -1,0 +1,1 @@
+{"type":"object","additionalProperties":false,"required":["request"],"properties":{"request":{"type":"string","minLength":1,"maxLength":12000},"context":{"type":"string","maxLength":12000},"constraints":{"type":"array","maxItems":30,"items":{"type":"string","maxLength":500}},"untrusted_content":{"type":"string","maxLength":20000},"dry_run":{"type":"boolean","const":true}}}

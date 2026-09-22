@@ -1,0 +1,5 @@
+{
+  "request": "Organize este pedido.",
+  "context": "Contexto fornecido pelo operador.",
+  "dry_run": true
+}
