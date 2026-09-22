@@ -31,6 +31,7 @@ import {
 import { useVoiceEngine } from "@/hooks/useVoiceEngine";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import { useLocalAgent } from "@/hooks/useLocalAgent";
+import { routeSkills } from "@/lib/skillRouter";
 import { askConfiguredAi, activeProvider, loadAiSettings } from "@/lib/aiClient";
 import { createLearnedMemory, loadPersistedMemories, persistMemories } from "@/lib/memoryStore";
 
@@ -99,7 +100,7 @@ const Index = () => {
 
   // ===================== Streaming + fala =====================
   const streamAssistantMessage = useCallback(
-    (draft: AgentResponseDraft, viaVoice = false) => {
+    (draft: AgentResponseDraft, viaVoice = false, selectedSkills?: NonNullable<ChatMessage["reasoningPlan"]>["selectedSkills"]) => {
       const id = `msg-${Date.now()}-r${Math.random().toString(36).slice(2, 6)}`;
       const base: ChatMessage = {
         id,
@@ -107,7 +108,7 @@ const Index = () => {
         senderName: draft.senderName,
         content: "",
         timestamp: nowTime(),
-        reasoningPlan: draft.reasoningPlan,
+        reasoningPlan: selectedSkills ? { ...draft.reasoningPlan, selectedSkills } : draft.reasoningPlan,
         toolExecution: draft.toolExecution,
         approvalRequestId: draft.approvalRequestId,
         viaVoice,
@@ -169,7 +170,10 @@ const Index = () => {
       setAgentBusyWith("Pensando...");
 
       const configuredProvider = activeProvider(aiSettings);
-      const skillRoutes = routeSkills(text, forceAgent || "supervisor");
+      const initialAnalysis = analyzeIntent(text);
+      if (forceAgent) initialAnalysis.targetAgent = forceAgent;
+      const analysis = attachSkillRoutes(text, initialAnalysis, forceAgent);
+      const skillRoutes = analysis.skillRoutes || [];
       const memoryRequest = text.match(/^\s*(?:memorize|guarde|lembre|anote|remember)\s*(?:que|:)?\s+(.+)/i);
       if (memoryRequest) {
         const memory = createLearnedMemory(memoryRequest[1].trim(), ["preferência", viaVoice ? "voz" : "manual"], "Memória ensinada pelo operador");
@@ -186,6 +190,7 @@ const Index = () => {
             modelUsed: "Jarvis Memory",
             latencyMs: 18,
             tokens: 40,
+            selectedSkills: skillRoutes,
           },
         }, viaVoice);
         return;
