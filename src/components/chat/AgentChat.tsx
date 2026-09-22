@@ -43,6 +43,7 @@ interface Props {
   onSelectAgent: (id: string | null) => void;
   onClearChat: () => void;
   onRequestApprovalView: (id?: string) => void;
+  onFeedback?: (id: string, feedback: "positive" | "negative") => void;
   voice: UseVoiceEngineReturn;
 }
 
@@ -98,6 +99,7 @@ export const AgentChat: React.FC<Props> = ({
   onSelectAgent,
   onClearChat,
   onRequestApprovalView,
+  onFeedback,
   voice,
 }) => {
   const [inputText, setInputText] = useState("");
@@ -392,14 +394,16 @@ export const AgentChat: React.FC<Props> = ({
                     <RefreshCw className="w-3.5 h-3.5" />
                   </button>
                   <button
-                    className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-400 hover:bg-slate-800 transition-all"
-                    title="Resposta útil (reforça memória)"
+                    onClick={() => onFeedback?.(msg.id, "positive")}
+                    className={`p-1.5 rounded-lg transition-all ${msg.feedback === "positive" ? "bg-emerald-400/15 text-emerald-300" : "text-slate-500 hover:text-emerald-400 hover:bg-slate-800"}`}
+                    title="Resposta útil (registra feedback)"
                   >
                     <ThumbsUp className="w-3.5 h-3.5" />
                   </button>
                   <button
-                    className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-slate-800 transition-all"
-                    title="Resposta ruim (ajusta roteamento)"
+                    onClick={() => onFeedback?.(msg.id, "negative")}
+                    className={`p-1.5 rounded-lg transition-all ${msg.feedback === "negative" ? "bg-rose-400/15 text-rose-300" : "text-slate-500 hover:text-rose-400 hover:bg-slate-800"}`}
+                    title="Resposta ruim (registra feedback)"
                   >
                     <ThumbsDown className="w-3.5 h-3.5" />
                   </button>

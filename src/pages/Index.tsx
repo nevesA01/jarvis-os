@@ -166,7 +166,8 @@ const Index = () => {
       if (configuredProvider && !forceAgent && !isWeatherQuestion(text)) {
         try {
           const recentMessages = [...messages, userMsg].filter((message) => message.sender === "user" || message.sender === "supervisor").slice(-12).map((message) => ({ role: message.sender === "user" ? "user" as const : "assistant" as const, content: message.content }));
-          const answer = await askConfiguredAi(aiSettings, recentMessages);
+          const memoryContext = memories.filter((memory) => `${memory.title} ${memory.content} ${memory.tags.join(" ")}`.toLowerCase().includes(text.toLowerCase().split(/\s+/).find((word) => word.length > 4) || "__none__"));
+          const answer = await askConfiguredAi(aiSettings, recentMessages, { memories: memoryContext, agent: forceAgent || "supervisor" });
           streamAssistantMessage({
             sender: "supervisor",
             senderName: `Jarvis · ${configuredProvider.name}`,
@@ -426,6 +427,21 @@ const Index = () => {
     setMemories((prev) => prev.filter((m) => m.id !== id));
   }, []);
 
+  const handleFeedback = useCallback((id: string, feedback: "positive" | "negative") => {
+    setMessages((prev) => prev.map((message) => message.id === id ? { ...message, feedback } : message));
+    setMemories((prev) => [{
+      id: `mem-feedback-${Date.now()}`,
+      type: "episodic",
+      title: feedback === "positive" ? "Resposta validada pelo operador" : "Resposta a revisar no próximo ciclo",
+      content: `Feedback ${feedback === "positive" ? "positivo" : "negativo"} registrado para a resposta do agente: ${id}. Usar este sinal para melhorar roteamento e qualidade.`,
+      category: "Aprendizado",
+      tags: ["feedback", feedback === "positive" ? "aprovado" : "revisar"],
+      createdAt: nowTime(),
+      updatedAt: nowTime(),
+      confidence: 1,
+    }, ...prev]);
+  }, []);
+
   const handleRestartContainer = useCallback((containerId: string) => {
     setContainers((prev) =>
       prev.map((c) =>
@@ -487,6 +503,7 @@ const Index = () => {
         onSendMessage={(text, forceAgent) => handleSendMessage(text, forceAgent)}
         onRegenerate={handleRegenerate}
         onClearChat={() => setMessages((prev) => prev.slice(0, 1))}
+        onFeedback={handleFeedback}
         approvals={approvals}
         onResolveApproval={handleResolveApproval}
         memories={memories}

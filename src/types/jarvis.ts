@@ -50,6 +50,7 @@ export interface ChatMessage {
     resultSnippet?: string;
     status: "success" | "pending_approval" | "blocked" | "running";
   };
+  feedback?: "positive" | "negative";
   approvalRequestId?: string;
 }
 

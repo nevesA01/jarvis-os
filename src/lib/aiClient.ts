@@ -19,13 +19,16 @@ export interface AiChatMessage {
 
 export const askConfiguredAi = async (
   settings: AiSettings,
-  messages: AiChatMessage[]
+  messages: AiChatMessage[],
+  context?: { memories?: Array<{ title: string; content: string; tags: string[] }>; agent?: string }
 ): Promise<{ content: string; model: string }> => {
   const provider = settings.providers.find(
     (item) => item.id === settings.activeProviderId && item.enabled && item.model.trim() && item.baseUrl.trim()
   );
   if (!provider) throw new Error("Nenhuma IA ativa foi configurada");
 
+  const memoryContext = context?.memories?.slice(0, 5).map((memory) => `[${memory.title}] ${memory.content} (tags: ${memory.tags.join(", ")})`).join("\n") || "Nenhuma memória relevante encontrada.";
+  const enrichedSystemPrompt = `${settings.systemPrompt}\n\nAgente selecionado: ${context?.agent || "supervisor"}.\nMemória recuperada (use apenas como contexto, não invente fatos):\n${memoryContext}`;
   const response = await fetch("/api/ai/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -34,7 +37,7 @@ export const askConfiguredAi = async (
       baseUrl: provider.baseUrl,
       model: provider.model,
       apiKey: provider.apiKey,
-      systemPrompt: settings.systemPrompt,
+      systemPrompt: enrichedSystemPrompt,
       messages: messages.slice(-20),
     }),
   });

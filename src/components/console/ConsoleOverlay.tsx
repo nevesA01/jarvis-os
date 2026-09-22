@@ -22,12 +22,15 @@ import {
 } from "@/types/jarvis";
 import { UseVoiceEngineReturn } from "@/hooks/useVoiceEngine";
 import { AiSettings } from "@/types/ai";
+import { SkillsCatalog } from "@/components/skills/SkillsCatalog";
+import { InferenceTelemetry } from "@/components/telemetry/InferenceTelemetry";
 import {
   MessageSquare,
   ShieldCheck,
   Activity,
   Brain,
   Rocket,
+  Sparkles,
   X,
   Settings2,
 } from "lucide-react";
@@ -41,6 +44,7 @@ interface ConsoleOverlayProps {
   onSendMessage: (text: string, forceAgent?: AgentId | null) => void;
   onRegenerate: () => void;
   onClearChat: () => void;
+  onFeedback: (id: string, feedback: "positive" | "negative") => void;
   approvals: ApprovalRequest[];
   onResolveApproval: (
     id: string,
@@ -65,13 +69,14 @@ interface ConsoleOverlayProps {
   onAiSettingsChange: (settings: AiSettings) => void;
 }
 
-type TabId = "chat" | "approvals" | "telemetry" | "memory" | "deploy" | "settings";
+type TabId = "chat" | "approvals" | "telemetry" | "memory" | "skills" | "deploy" | "settings";
 
 const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
   { id: "chat", label: "Canal Neural", icon: <MessageSquare className="w-4 h-4" /> },
   { id: "approvals", label: "Aprovações", icon: <ShieldCheck className="w-4 h-4" /> },
   { id: "telemetry", label: "Telemetria", icon: <Activity className="w-4 h-4" /> },
   { id: "memory", label: "Memória", icon: <Brain className="w-4 h-4" /> },
+  { id: "skills", label: "Skills", icon: <Sparkles className="w-4 h-4" /> },
   { id: "deploy", label: "Deploy", icon: <Rocket className="w-4 h-4" /> },
   { id: "settings", label: "IAs", icon: <Settings2 className="w-4 h-4" /> },
 ];
@@ -85,6 +90,7 @@ const ConsoleOverlay = ({
   onSendMessage,
   onRegenerate,
   onClearChat,
+  onFeedback,
   approvals,
   onResolveApproval,
   memories,
@@ -187,6 +193,7 @@ const ConsoleOverlay = ({
                   onSelectAgent={setSelectedAgentId}
                   onClearChat={onClearChat}
                   onRequestApprovalView={() => setTab("approvals")}
+                  onFeedback={onFeedback}
                   voice={voice}
                   />
                 </>
@@ -198,12 +205,15 @@ const ConsoleOverlay = ({
                 />
               )}
               {tab === "telemetry" && (
-                <VpsTelemetryView
-                  telemetry={INITIAL_TELEMETRY}
-                  containers={containers}
-                  auditLogs={INITIAL_AUDIT_LOGS}
-                  onRestartContainer={onRestartContainer}
-                />
+                <>
+                  <InferenceTelemetry messages={messages} />
+                  <VpsTelemetryView
+                    telemetry={INITIAL_TELEMETRY}
+                    containers={containers}
+                    auditLogs={INITIAL_AUDIT_LOGS}
+                    onRestartContainer={onRestartContainer}
+                  />
+                </>
               )}
               {tab === "memory" && (
                 <MemoryManager
@@ -212,6 +222,7 @@ const ConsoleOverlay = ({
                   onDeleteMemory={onDeleteMemory}
                 />
               )}
+              {tab === "skills" && <SkillsCatalog />}
               {tab === "deploy" && <VpsDeployHub />}
               {tab === "settings" && <AiSettingsPanel onSettingsChange={onAiSettingsChange} />}
             </div>
