@@ -17,7 +17,7 @@ Se o PowerShell estiver em `C:\Windows\System32`, abra a pasta raiz do projeto n
 4. Mantenha a janela aberta. Se o prompt `PS ...>` reaparecer logo depois das mensagens, o agente encerrou; execute o comando novamente e não pressione `Ctrl + C`.
 5. Copie o código de pareamento exibido no terminal.
 6. Abra a console do Jarvis, em **Acesso ao computador**.
-7. Cole o código e clique em **Parear agente**.
+7. Cole o código e clique em **Parear agente**. O código é de uso único e expira em 5 minutos.
 
 ## Primeiro teste
 

@@ -65,6 +65,7 @@ interface ConsoleOverlayProps {
     error: string;
     onPair: (code: string) => void;
     onDisconnect: () => void;
+    onRefresh: () => void;
   };
   onAiSettingsChange: (settings: AiSettings) => void;
 }
@@ -182,6 +183,7 @@ const ConsoleOverlay = ({
                     error={localAgent.error}
                     onPair={localAgent.onPair}
                     onDisconnect={localAgent.onDisconnect}
+                    onRefresh={localAgent.onRefresh}
                   />
                   <AgentChat
                   messages={messages}

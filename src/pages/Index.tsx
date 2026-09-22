@@ -557,6 +557,7 @@ const Index = () => {
           error: localAgent.error,
           onPair: (code) => void localAgent.pair(code),
           onDisconnect: () => void localAgent.disconnect(),
+          onRefresh: () => void localAgent.refresh(),
         }}
         onAiSettingsChange={setAiSettings}
       />

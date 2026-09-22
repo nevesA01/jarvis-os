@@ -1,5 +1,6 @@
 import { defineWebSocketHandler } from "nitro/h3";
 import type { Peer } from "crossws";
+import { hasPairedDevice, isValidPairingCode, registerPairedDevice } from "../api/pairing.post";
 
 const endpointPath = "/ws/local-agent";
 const maxMessageBytes = 256 * 1024;
@@ -50,6 +51,8 @@ export default defineWebSocketHandler((event) => {
   }
 
   let heartbeat: ReturnType<typeof setInterval> | undefined;
+  let deviceId: string | null = null;
+  let paired = false;
 
   return {
     open(peer) {
@@ -66,6 +69,7 @@ export default defineWebSocketHandler((event) => {
         type: "agent_connected",
         endpoint: endpointPath,
         heartbeat_interval_ms: heartbeatIntervalMs,
+        pairing_required: true,
       });
     },
     message(peer, message) {
@@ -81,10 +85,40 @@ export default defineWebSocketHandler((event) => {
       }
 
       if (payload.type === "agent_hello") {
+        const requestedDeviceId = typeof payload.device_id === "string" ? payload.device_id.trim() : "";
+        if (!requestedDeviceId || requestedDeviceId.length > 120 || /[\u0000-\u001f]/.test(requestedDeviceId)) {
+          sendJson(peer, { type: "error", code: "invalid_device_id" });
+          return;
+        }
+        deviceId = requestedDeviceId;
+        paired = hasPairedDevice(deviceId);
         sendJson(peer, {
           type: "agent_ack",
-          device_id: typeof payload.device_id === "string" ? payload.device_id : null,
+          device_id: deviceId,
+          paired,
+          pairing_required: !paired,
         });
+        return;
+      }
+
+      if (payload.type === "pairing_request") {
+        const code = typeof payload.code === "string" ? payload.code.trim() : "";
+        if (!deviceId) {
+          sendJson(peer, { type: "error", code: "agent_hello_required" });
+          return;
+        }
+        if (!isValidPairingCode(code)) {
+          sendJson(peer, { type: "error", code: "invalid_or_expired_pairing_code" });
+          return;
+        }
+        registerPairedDevice(deviceId);
+        paired = true;
+        sendJson(peer, { type: "pairing_ack", device_id: deviceId, paired: true });
+        return;
+      }
+
+      if (!paired) {
+        sendJson(peer, { type: "error", code: "pairing_required" });
         return;
       }
 

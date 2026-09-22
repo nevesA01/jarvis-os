@@ -10,6 +10,7 @@ const PORT = 3210;
 const MAX_BODY_BYTES = 2 * 1024 * 1024;
 const agentName = os.hostname();
 let pairingCode = String(crypto.randomInt(100000, 1000000));
+let pairingExpiresAt = Date.now() + 5 * 60 * 1000;
 let authToken = null;
 const usedRequestIds = new Set();
 
@@ -130,14 +131,21 @@ const server = http.createServer(async (request, response) => {
     }
     if (request.method === "POST" && request.url === "/pair") {
       const body = await readJson(request);
+      if (Date.now() > pairingExpiresAt) {
+        pairingCode = String(crypto.randomInt(100000, 1000000));
+        pairingExpiresAt = Date.now() + 5 * 60 * 1000;
+        return send(response, 410, { error: "Código de pareamento expirado" });
+      }
       if (String(body.pairingCode || "") !== pairingCode) return send(response, 401, { error: "Código de pareamento inválido" });
       authToken = crypto.randomBytes(32).toString("hex");
+      pairingCode = "";
       return send(response, 200, { token: authToken, agentName });
     }
     if (request.method === "POST" && request.url === "/disconnect") {
       if (!isAuthorized(request)) return send(response, 401, { error: "Não autorizado" });
       authToken = null;
       pairingCode = String(crypto.randomInt(100000, 1000000));
+      pairingExpiresAt = Date.now() + 5 * 60 * 1000;
       usedRequestIds.clear();
       return send(response, 200, { ok: true });
     }
