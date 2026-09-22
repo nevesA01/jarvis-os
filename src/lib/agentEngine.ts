@@ -165,7 +165,7 @@ const buildLocalAction = (text: string) => {
     discord: "Discord.exe",
     spotify: "Spotify.exe",
     teams: "ms-teams.exe",
-    whatsapp: "WhatsApp.exe",
+    whatsapp: "whatsapp",
   };
   const openMatch = text.match(/\b(?:abrir|abra|iniciar|inicie)\s+(?:o|a)?\s*([\w ._-]+?)(?:\s+(?:por favor|agora|para mim))?\s*$/i);
   if (openMatch) {

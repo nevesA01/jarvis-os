@@ -48,6 +48,14 @@ const requireString = (value, name) => {
   return value;
 };
 
+const resolveApplication = (value) => {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "whatsapp" || normalized === "whatsapp desktop") {
+    return "shell:AppsFolder\\\\5319275A.WhatsAppDesktop_cv1g1gvanyjgm!App";
+  }
+  return value;
+};
+
 const execute = async (payload) => {
   const requestId = requireString(payload.requestId, "request_id");
   if (usedRequestIds.has(requestId)) throw new Error("request_already_used");
@@ -71,11 +79,14 @@ const execute = async (payload) => {
       return { path: directory, entries: entries.map((entry) => ({ name: entry.name, type: entry.isDirectory() ? "directory" : "file" })) };
     }
     case "open_application": {
-      const application = requireString(payload.application, "application");
+      const requestedApplication = requireString(payload.application, "application");
+      const application = resolveApplication(requestedApplication);
       const args = Array.isArray(payload.args) ? payload.args.map((arg) => requireString(arg, "argument")) : [];
-      const child = spawn(application, args, { detached: true, stdio: "ignore", shell: false, windowsHide: false });
+      const executable = application.startsWith("shell:") ? "explorer.exe" : application;
+      const executableArgs = application.startsWith("shell:") ? [application, ...args] : args;
+      const child = spawn(executable, executableArgs, { detached: true, stdio: "ignore", shell: false, windowsHide: false });
       child.unref();
-      return { application, started: true };
+      return { application, started: true, launcher: executable };
     }
     case "close_application": {
       const application = requireString(payload.application, "application").replace(/[^a-zA-Z0-9_.-]/g, "");

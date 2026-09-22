@@ -513,9 +513,9 @@ export const AgentChat: React.FC<Props> = ({
           <div className="rounded-2xl border border-cyan-300/15 bg-[#07111f] p-3 shadow-inner shadow-cyan-950/20">
             <div className="mb-2 flex items-center justify-between gap-3">
               <label htmlFor="jarvis-command" className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100/60">
-                Próximo comando
+                Entrada alternativa
               </label>
-              <span className="text-[10px] text-slate-500">Enter envia · Shift + Enter quebra linha</span>
+              <span className="text-[10px] text-slate-500">O canal principal é voz · digitação é opcional</span>
             </div>
             <div className="flex items-end gap-2">
               <div className="relative flex-1">

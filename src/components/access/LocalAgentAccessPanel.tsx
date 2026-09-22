@@ -39,7 +39,7 @@ export const LocalAgentAccessPanel = ({ status, agentName, error, onPair, onDisc
               </span>
             </div>
             <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-300">
-              O Jarvis pede autorização antes de cada ação local. Nenhum pedido é enviado ao agente sem uma confirmação sua.
+              O Jarvis recebe comandos por voz e envia somente ações autorizadas para a ponte local. A confirmação falada é registrada antes da execução.
             </p>
           </div>
         </div>

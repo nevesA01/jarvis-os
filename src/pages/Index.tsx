@@ -31,6 +31,7 @@ import { useVoiceEngine } from "@/hooks/useVoiceEngine";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import { useLocalAgent } from "@/hooks/useLocalAgent";
 import { askConfiguredAi, activeProvider, loadAiSettings } from "@/lib/aiClient";
+import { createLearnedMemory, loadPersistedMemories, persistMemories } from "@/lib/memoryStore";
 
 /** Deriva o modo da esfera a partir do estado atual do sistema */
 const sphereModeFrom = (
@@ -70,7 +71,7 @@ const Index = () => {
     },
   ]);
   const [approvals, setApprovals] = useState<ApprovalRequest[]>(INITIAL_APPROVALS);
-  const [memories, setMemories] = useState<MemoryItem[]>(INITIAL_MEMORIES);
+  const [memories, setMemories] = useState<MemoryItem[]>(() => loadPersistedMemories(INITIAL_MEMORIES));
   const [containers, setContainers] = useState<DockerContainer[]>(INITIAL_CONTAINERS);
   const [isThinking, setIsThinking] = useState(false);
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
@@ -86,6 +87,10 @@ const Index = () => {
 
   const nowTime = () =>
     new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+
+  useEffect(() => {
+    persistMemories(memories);
+  }, [memories]);
 
   const appendMessage = useCallback((msg: ChatMessage) => {
     setMessages((prev) => [...prev, msg]);
@@ -163,6 +168,27 @@ const Index = () => {
       setAgentBusyWith("Pensando...");
 
       const configuredProvider = activeProvider(aiSettings);
+      const memoryRequest = text.match(/^\s*(?:memorize|guarde|lembre|anote|remember)\s*(?:que|:)?\s+(.+)/i);
+      if (memoryRequest) {
+        const memory = createLearnedMemory(memoryRequest[1].trim(), ["preferência", viaVoice ? "voz" : "manual"], "Memória ensinada pelo operador");
+        setMemories((prev) => [memory, ...prev]);
+        streamAssistantMessage({
+          sender: "supervisor",
+          senderName: "Supervisor Nexus",
+          content: `🧠 Entendido. Memorizei: **${memoryRequest[1].trim()}**. Vou usar essa informação como contexto nas próximas respostas.`,
+          reasoningPlan: {
+            intent: "memory_write",
+            delegatedAgent: "supervisor",
+            risk: "low",
+            requiresApproval: false,
+            modelUsed: "Jarvis Memory",
+            latencyMs: 18,
+            tokens: 40,
+          },
+        }, viaVoice);
+        return;
+      }
+
       if (configuredProvider && !forceAgent && !isWeatherQuestion(text)) {
         try {
           const recentMessages = [...messages, userMsg].filter((message) => message.sender === "user" || message.sender === "supervisor").slice(-12).map((message) => ({ role: message.sender === "user" ? "user" as const : "assistant" as const, content: message.content }));
@@ -234,7 +260,7 @@ const Index = () => {
         streamAssistantMessage(buildAgentResponse(text, analysis), viaVoice);
       }, 350);
     },
-    [aiSettings, appendMessage, messages, streamAssistantMessage]
+    [aiSettings, appendMessage, messages, memories, streamAssistantMessage]
   );
 
   // ===================== Voice =====================
@@ -300,12 +326,18 @@ const Index = () => {
         void localAgent.execute({
           requestId: id,
           ...localAction,
-        }).then(() => {
+        }).then((result) => {
+          const resultText = typeof result === "string" ? result : JSON.stringify(result);
+          setMemories((prev) => [createLearnedMemory(
+            `A ação autorizada "${target.title}" terminou com sucesso. Resultado observado: ${resultText.slice(0, 500)}`,
+            ["execução", target.details.localAction?.action || "ação-local"],
+            "Execução local aprendida"
+          ), ...prev]);
           appendMessage({
             id: `msg-${Date.now()}-local`,
             sender: "supervisor",
             senderName: "Supervisor Nexus",
-            content: `✅ Ação local executada pelo agente Windows: **${target.title}**.`,
+            content: `✅ Ação local executada pelo agente Windows: **${target.title}**.\n\nResultado: \`${resultText.slice(0, 500)}\``,
             timestamp: nowTime(),
             reasoningPlan: {
               intent: "local_agent_execution",
@@ -378,7 +410,7 @@ const Index = () => {
       if (captionTimerRef.current) window.clearTimeout(captionTimerRef.current);
       captionTimerRef.current = window.setTimeout(() => setCaption(null), 6000);
     },
-    [approvals, appendMessage]
+    [approvals, appendMessage, localAgent]
   );
 
   // Autorização por voz: "autorizar/sim" aprova, "recusar/não/cancelar" rejeita.
@@ -402,7 +434,7 @@ const Index = () => {
           return;
         }
       }
-      handleSendRef.current(text);
+      handleSendRef.current(text, null, true);
     };
   }, [approvals]);
 

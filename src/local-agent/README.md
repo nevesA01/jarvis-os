@@ -21,7 +21,7 @@ Se o PowerShell estiver em `C:\Windows\System32`, abra a pasta raiz do projeto n
 
 ## Primeiro teste
 
-Depois que o painel mostrar **Conectado**, peça ao Jarvis para listar uma pasta. A interface ainda precisa enviar pedidos autorizados para o agente para executar uma ação; o endpoint local já está preparado para isso.
+Depois que o painel mostrar **Conectado**, peça ao Jarvis por voz: “Jarvis, abra o WhatsApp”. A ação será mostrada na fila, e você poderá dizer “Jarvis, autorizar”. O agente resolve o WhatsApp da Microsoft Store via `shell:AppsFolder`; para outras instalações, use o nome do executável conhecido.
 
 ## Segurança
 
