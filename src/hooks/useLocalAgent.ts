@@ -11,6 +11,32 @@ export interface LocalAgentRequest {
 const LOCAL_AGENT_URL = "http://127.0.0.1:3210";
 const AGENT_NAME = "Jarvis Local Agent — Windows";
 const PHASE_A_MESSAGE = "O agente local ainda não aceita execuções nesta fase.";
+const TOKEN_STORAGE_KEY = "jarvis.localAgent.token";
+
+const loadStoredToken = () => {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage.getItem(TOKEN_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+};
+
+const saveStoredToken = (token: string) => {
+  try {
+    window.localStorage.setItem(TOKEN_STORAGE_KEY, token);
+  } catch {
+    // O pareamento continua válido durante a sessão mesmo se o armazenamento estiver bloqueado.
+  }
+};
+
+const clearStoredToken = () => {
+  try {
+    window.localStorage.removeItem(TOKEN_STORAGE_KEY);
+  } catch {
+    // Não impede a desconexão do agente.
+  }
+};
 
 interface StatusResponse {
   paired?: boolean;
@@ -27,7 +53,7 @@ export const useLocalAgent = () => {
   const [status, setStatus] = useState<LocalAgentStatus>("checking");
   const [agentName, setAgentName] = useState(AGENT_NAME);
   const [error, setError] = useState("");
-  const tokenRef = useRef<string | null>(localStorage.getItem("jarvis.localAgent.token"));
+  const tokenRef = useRef<string | null>(loadStoredToken());
 
   const refresh = useCallback(async () => {
     try {
@@ -66,7 +92,7 @@ export const useLocalAgent = () => {
       const data = await response.json() as PairResponse;
       if (!response.ok || !data.token) throw new Error(data.error || "Código de pareamento inválido");
       tokenRef.current = data.token;
-      localStorage.setItem("jarvis.localAgent.token", data.token);
+      saveStoredToken(data.token);
       setAgentName(data.agentName || AGENT_NAME);
       setStatus("paired");
     } catch (pairError) {
@@ -83,7 +109,7 @@ export const useLocalAgent = () => {
       }).catch(() => undefined);
     }
     tokenRef.current = null;
-    localStorage.removeItem("jarvis.localAgent.token");
+    clearStoredToken();
     setStatus("disconnected");
     setError("");
   }, []);
