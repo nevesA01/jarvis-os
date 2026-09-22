@@ -24,10 +24,10 @@ export const LocalAgentAccessPanel = ({ status, agentName, error, onPair, onDisc
   const checking = status === "checking";
 
   return (
-    <section className="rounded-2xl border border-cyan-500/20 bg-slate-900/90 p-5 shadow-2xl shadow-cyan-950/20">
+    <section className="rounded-[1.5rem] border border-emerald-300/15 bg-[#0a1928]/90 p-5 shadow-[0_18px_55px_rgba(2,12,28,0.3)]">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-start gap-3">
-          <div className="rounded-xl border border-cyan-400/30 bg-cyan-400/10 p-2.5 text-cyan-200">
+          <div className="rounded-2xl border border-emerald-300/25 bg-emerald-300/10 p-2.5 text-emerald-200">
             <Laptop className="h-5 w-5" />
           </div>
           <div>

@@ -109,34 +109,37 @@ const ConsoleOverlay = ({
           : "opacity-0 pointer-events-none translate-y-8"
       }`}
     >
-      <div className="absolute inset-0 bg-[#040814]/97 backdrop-blur-2xl" />
+      <div className="absolute inset-0 bg-[#06101d]/95 backdrop-blur-2xl" />
       <div className="absolute inset-0 flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 sm:px-8 h-16 border-b border-cyan-500/15">
-          <div className="flex items-center gap-3">
-            <JarvisCoreLogo size={28} animated />
-            <span className="font-mono text-[11px] tracking-[0.4em] text-cyan-200/70">
-              CONSOLE TÁTICO
-            </span>
+        <div className="flex items-center justify-between gap-4 px-5 sm:px-8 h-20 border-b border-white/[0.08] bg-white/[0.025]">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="rounded-2xl border border-cyan-300/25 bg-cyan-300/10 p-2">
+              <JarvisCoreLogo size={28} animated />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-cyan-200/60">J.A.R.V.I.S.</div>
+              <div className="text-base font-semibold text-white">Console de comando</div>
+            </div>
           </div>
           <button
             onClick={onClose}
-            className="flex items-center gap-2 font-mono text-[10px] tracking-[0.3em] text-cyan-300/60 hover:text-cyan-100 border border-cyan-500/25 rounded-full px-4 py-2 hover:border-cyan-400/50 transition-colors"
+            className="flex shrink-0 items-center gap-2 rounded-xl border border-white/[0.1] bg-white/[0.04] px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-100/75 transition-colors hover:border-cyan-300/40 hover:bg-cyan-300/10 hover:text-white"
           >
-            <X className="w-3.5 h-3.5" /> VOLTAR AO NÚCLEO
+            <X className="w-3.5 h-3.5" /> Fechar
           </button>
         </div>
 
         {/* Tabs */}
-        <div className="flex items-center gap-1.5 px-5 sm:px-8 py-3 border-b border-cyan-500/10 overflow-x-auto">
+        <div className="flex items-center gap-1.5 px-5 sm:px-8 py-3 border-b border-white/[0.07] bg-[#081524] overflow-x-auto">
           {TABS.map((t) => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`relative flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-mono font-semibold whitespace-nowrap transition-all ${
+              className={`relative flex items-center gap-2 rounded-xl border px-4 py-2.5 text-xs font-semibold whitespace-nowrap transition-all ${
                 tab === t.id
-                  ? "bg-cyan-500/15 text-cyan-200 border border-cyan-400/40"
-                  : "text-slate-400 hover:text-white border border-transparent hover:bg-slate-800/50"
+                  ? "border-cyan-300/35 bg-cyan-300/12 text-cyan-100 shadow-[0_0_18px_rgba(103,232,249,0.08)]"
+                  : "border-transparent text-slate-400 hover:border-white/[0.08] hover:bg-white/[0.05] hover:text-white"
               }`}
             >
               {t.icon}

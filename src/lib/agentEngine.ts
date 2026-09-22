@@ -149,25 +149,39 @@ const buildLocalAction = (text: string) => {
     return { action: "read_file" as const, path };
   }
 
-  const openMatch = normalized.match(/\b(?:abrir|abra|iniciar|inicie|fechar|feche)\s+(?:o|a)?\s*([a-z0-9 ._-]+)/i);
-  if (openMatch && /\b(abrir|abra|iniciar|inicie)\b/.test(normalized)) {
-    const applicationName = openMatch[1].trim().replace(/\\s+(por favor|agora)$/i, "");
-    const applications: Record<string, string> = {
-      chrome: "chrome.exe",
-      "google chrome": "chrome.exe",
-      edge: "msedge.exe",
-      "microsoft edge": "msedge.exe",
-      notepad: "notepad.exe",
-      bloco: "notepad.exe",
-      calculadora: "calc.exe",
-      calculator: "calc.exe",
-      explorer: "explorer.exe",
-      explorador: "explorer.exe",
-      vscode: "code.cmd",
-      "visual studio code": "code.cmd",
-      discord: "Discord.exe",
-    };
+  const applications: Record<string, string> = {
+    chrome: "chrome.exe",
+    "google chrome": "chrome.exe",
+    edge: "msedge.exe",
+    "microsoft edge": "msedge.exe",
+    notepad: "notepad.exe",
+    bloco: "notepad.exe",
+    calculadora: "calc.exe",
+    calculator: "calc.exe",
+    explorer: "explorer.exe",
+    explorador: "explorer.exe",
+    vscode: "code.cmd",
+    "visual studio code": "code.cmd",
+    discord: "Discord.exe",
+    spotify: "Spotify.exe",
+    teams: "ms-teams.exe",
+    whatsapp: "WhatsApp.exe",
+  };
+  const openMatch = text.match(/\b(?:abrir|abra|iniciar|inicie)\s+(?:o|a)?\s*([\w ._-]+?)(?:\s+(?:por favor|agora|para mim))?\s*$/i);
+  if (openMatch) {
+    const applicationName = openMatch[1].trim().toLowerCase();
     return { action: "open_application" as const, application: applications[applicationName] || applicationName };
+  }
+
+  const closeMatch = text.match(/\b(?:fechar|feche|encerrar|encerre|finalizar|finalize)\s+(?:o|a)?\s*([\w ._-]+?)\s*$/i);
+  if (closeMatch) {
+    const applicationName = closeMatch[1].trim().toLowerCase();
+    return { action: "close_application" as const, application: applications[applicationName] || applicationName };
+  }
+
+  const downloadMatch = text.match(/\b(?:baixe|baixar|download)\s+(?:o\s+arquivo\s+)?(https?:\/\/\S+)(?:\s+(?:para|em)\s+(.+))?$/i);
+  if (downloadMatch) {
+    return { action: "download_file" as const, url: downloadMatch[1], destination: downloadMatch[2]?.trim() || "download.bin" };
   }
 
   const writeMatch = text.match(/(?:crie|criar|escreva|escrever|salve|salvar)\s+(?:um\s+)?arquivo\s+["“”']?([^"“”']+?)["“”']?\s+(?:com|contendo)\s+([\s\S]+)/i);

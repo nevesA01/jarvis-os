@@ -4,13 +4,15 @@ export type LocalAgentStatus = "checking" | "disconnected" | "paired" | "error";
 
 export interface LocalAgentRequest {
   requestId: string;
-  action: "read_file" | "write_file" | "list_directory" | "open_application" | "run_command";
+  action: "read_file" | "write_file" | "list_directory" | "open_application" | "close_application" | "run_command" | "download_file";
   path?: string;
   content?: string;
   application?: string;
   args?: string[];
   command?: string;
   workingDirectory?: string;
+  url?: string;
+  destination?: string;
 }
 
 interface AgentStatusResponse {

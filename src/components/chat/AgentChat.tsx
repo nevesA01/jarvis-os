@@ -27,6 +27,8 @@ import {
   ThumbsDown,
   Brain,
   Radio,
+  Activity,
+  Lightbulb,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -102,6 +104,7 @@ export const AgentChat: React.FC<Props> = ({
   const [agentSelectorOpen, setAgentSelectorOpen] = useState(false);
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
   const [autoScroll, setAutoScroll] = useState(true);
+  const [showPromptGuide, setShowPromptGuide] = useState(true);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -146,24 +149,29 @@ export const AgentChat: React.FC<Props> = ({
 
   const samplePrompts = [
     {
-      label: "🛡️ Auditar Segurança",
+      label: "Status da VPS",
+      prompt: "Verificar consumo de CPU, RAM e integridade dos containers Docker",
+      icon: <Activity className="h-3.5 w-3.5 text-cyan-300" />,
+    },
+    {
+      label: "Auditar segurança",
       prompt: "Executar análise defensiva SAST e verificar portas abertas no firewall",
+      icon: <Shield className="h-3.5 w-3.5 text-rose-300" />,
     },
     {
-      label: "💻 Criar Endpoint FastAPI",
+      label: "Criar endpoint",
       prompt: "Criar uma rota autenticada com Pydantic v2 e rate limiting no FastAPI",
+      icon: <Code className="h-3.5 w-3.5 text-emerald-300" />,
     },
     {
-      label: "⚠️ Teste de Risco Alto",
+      label: "Pesquisar solução",
+      prompt: "Pesquisar a melhor forma de orquestrar agentes com LangGraph",
+      icon: <Search className="h-3.5 w-3.5 text-amber-300" />,
+    },
+    {
+      label: "Ação crítica",
       prompt: "Executar docker volume prune -a para remover volumes órfãos da VPS",
-    },
-    {
-      label: "📊 Vitals da VPS",
-      prompt: "Verificar consumo de CPU, RAM e integridade dos 6 containers Docker",
-    },
-    {
-      label: "📚 Pesquisar Frameworks",
-      prompt: "Pesquisar a melhor forma de orquestrar agentes com LangGraph na VPS",
+      icon: <AlertTriangle className="h-3.5 w-3.5 text-orange-300" />,
     },
   ];
 
@@ -221,26 +229,24 @@ export const AgentChat: React.FC<Props> = ({
   const voiceDemo = !voice.isSupported || voice.status === "demo";
 
   return (
-    <div className="flex flex-col h-[calc(100vh-13rem)] min-h-[560px] rounded-2xl hud-border bg-slate-950/80 overflow-hidden shadow-2xl relative">
+    <div className="flex flex-col h-[calc(100vh-13rem)] min-h-[560px] rounded-[1.75rem] border border-cyan-400/20 bg-[#07111f]/90 overflow-hidden shadow-[0_24px_80px_rgba(1,8,20,0.55)] relative">
       {/* Top Chat Header */}
-      <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-800/80 bg-slate-900/60 backdrop-blur shrink-0">
-        <div className="flex items-center gap-3">
-          <JarvisCoreLogo size={36} animated={true} />
-          <div>
+      <div className="flex items-center justify-between gap-4 px-5 py-4 border-b border-white/[0.07] bg-white/[0.025] backdrop-blur shrink-0">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="rounded-2xl border border-cyan-300/25 bg-cyan-300/10 p-2">
+            <JarvisCoreLogo size={30} animated={true} />
+          </div>
+          <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h2 className="text-sm font-semibold text-white">Canal Neural de Orquestração</h2>
-              <span
-                className={`w-2 h-2 rounded-full ${
-                  isStreaming ? "bg-sky-400 animate-ping" : "bg-emerald-400"
-                }`}
-              />
+              <h2 className="text-sm font-semibold tracking-tight text-white truncate">Canal Neural</h2>
+              <span className={`h-2 w-2 rounded-full shrink-0 ${isStreaming ? "bg-cyan-300 animate-ping" : "bg-emerald-300"}`} />
             </div>
-            <p className="text-[11px] font-mono text-slate-400">
+            <p className="text-[11px] text-slate-400 truncate">
               {isStreaming
-                ? "⚡ Processando pipeline neural em tempo real..."
+                ? "Processando sua solicitação..."
                 : selectedAgentId
-                ? `Roteamento travado no agente: ${selectedAgentId.toUpperCase()}`
-                : "Supervisão semântica automática e Human-in-the-Loop ativa"}
+                ? `Agente fixado: ${selectedAgentId}`
+                : "Supervisor ativo · aprovação humana protegida"}
             </p>
           </div>
         </div>
@@ -249,10 +255,10 @@ export const AgentChat: React.FC<Props> = ({
           variant="ghost"
           size="sm"
           onClick={onClearChat}
-          className="text-xs text-slate-400 hover:text-white hover:bg-slate-800"
+          className="shrink-0 rounded-xl border border-white/[0.07] bg-white/[0.025] text-[11px] text-slate-400 hover:bg-white/[0.08] hover:text-white"
         >
           <RefreshCw className="w-3.5 h-3.5 mr-1" />
-          Limpar Sessão
+          Limpar
         </Button>
       </div>
 
@@ -419,22 +425,38 @@ export const AgentChat: React.FC<Props> = ({
       )}
 
       {/* Suggested Quick Prompts */}
-      <div className="px-4 py-2 bg-slate-950 border-t border-slate-800/80 flex items-center gap-2 overflow-x-auto text-xs shrink-0">
-        <span className="text-[11px] font-mono text-slate-500 shrink-0">Rápido:</span>
-        {samplePrompts.map((p, idx) => (
+      <div className="border-t border-white/[0.07] bg-[#081524] px-4 py-3 shrink-0">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+            <Lightbulb className="h-3.5 w-3.5 text-amber-300" /> Comece por aqui
+          </div>
           <button
-            key={idx}
-            onClick={() => onSendMessage(p.prompt)}
-            disabled={isStreaming}
-            className="shrink-0 px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-sky-500/40 text-slate-300 hover:text-white transition-all text-xs font-mono disabled:opacity-40"
+            type="button"
+            onClick={() => setShowPromptGuide((visible) => !visible)}
+            className="text-[10px] text-cyan-300/70 hover:text-cyan-100"
           >
-            {p.label}
+            {showPromptGuide ? "Ocultar sugestões" : "Mostrar sugestões"}
           </button>
-        ))}
+        </div>
+        {showPromptGuide && (
+          <div className="flex items-center gap-2 overflow-x-auto pb-0.5">
+            {samplePrompts.map((p) => (
+              <button
+                key={p.label}
+                onClick={() => onSendMessage(p.prompt)}
+                disabled={isStreaming}
+                className="flex shrink-0 items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.035] px-3 py-2 text-xs text-slate-300 transition hover:border-cyan-300/40 hover:bg-cyan-300/10 hover:text-white disabled:opacity-40"
+              >
+                {p.icon}
+                {p.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Input Form with Agent Selector & Voice */}
-      <div className="p-3 sm:p-4 bg-slate-900/80 border-t border-slate-800 relative shrink-0">
+      <div className="p-3 sm:p-4 bg-[#0b1929] border-t border-white/[0.07] relative shrink-0">
         {/* Live voice status strip (always-listening engine) */}
         {voice.isEnabled && voiceStrip && (
           <div
@@ -483,114 +505,88 @@ export const AgentChat: React.FC<Props> = ({
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-2">
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div className="rounded-2xl border border-cyan-300/15 bg-[#07111f] p-3 shadow-inner shadow-cyan-950/20">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <label htmlFor="jarvis-command" className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100/60">
+                Próximo comando
+              </label>
+              <span className="text-[10px] text-slate-500">Enter envia · Shift + Enter quebra linha</span>
+            </div>
+            <div className="flex items-end gap-2">
+              <div className="relative flex-1">
+                <Textarea
+                  id="jarvis-command"
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder={
+                    voice.isEnabled
+                      ? 'Diga “Jarvis” + comando ou escreva aqui...'
+                      : "Descreva o que precisa: objetivo, alvo e resultado esperado"
+                  }
+                  rows={2}
+                  disabled={isStreaming}
+                  className="min-h-[72px] rounded-xl border-white/[0.08] bg-white/[0.035] pr-12 text-sm text-slate-100 placeholder:text-slate-500 focus-visible:ring-cyan-300/50 resize-none"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={voice.toggle}
+                  className={`absolute right-2 bottom-2 rounded-xl transition-all ${voice.isEnabled ? "bg-cyan-300/15 text-cyan-200 shadow-[0_0_18px_rgba(103,232,249,0.25)]" : "text-slate-400 hover:bg-white/[0.06] hover:text-cyan-200"}`}
+                  title={voice.isEnabled ? "Desligar microfone" : "Ativar escuta por voz"}
+                >
+                  {voice.isEnabled ? <Mic className="w-4 h-4 animate-pulse" /> : <MicOff className="w-4 h-4" />}
+                </Button>
+              </div>
+              <Button
+                type="submit"
+                disabled={!inputText.trim() || isStreaming}
+                className="h-[72px] rounded-xl bg-cyan-300 px-5 font-semibold text-slate-950 shadow-[0_8px_24px_rgba(103,232,249,0.18)] hover:bg-cyan-200 disabled:opacity-40"
+              >
+                {isStreaming ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+                <span className="sr-only">Enviar comando</span>
+              </Button>
+            </div>
+          </div>
+
           {/* Agent Selector Row */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between gap-2">
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setAgentSelectorOpen((v) => !v)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-sky-500/50 text-xs font-mono text-slate-300 transition-all"
+                className="flex items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.035] px-3 py-1.5 text-xs text-slate-300 transition-all hover:border-cyan-300/40"
               >
-                {AGENT_SELECTOR.find((a) => a.id === (selectedAgentId as any))?.icon || (
-                  <Cpu className="w-3.5 h-3.5 text-sky-400" />
-                )}
-                <span className="max-w-[140px] truncate">
-                  {AGENT_SELECTOR.find((a) => a.id === (selectedAgentId as any))?.label ||
-                    "Auto (Supervisor)"}
-                </span>
-                <ChevronDown
-                  className={`w-3.5 h-3.5 text-slate-500 transition-transform ${
-                    agentSelectorOpen ? "rotate-180" : ""
-                  }`}
-                />
+                {AGENT_SELECTOR.find((a) => a.id === (selectedAgentId as any))?.icon || <Cpu className="h-3.5 w-3.5 text-cyan-300" />}
+                <span className="max-w-[160px] truncate">{AGENT_SELECTOR.find((a) => a.id === (selectedAgentId as any))?.label || "Auto · Supervisor decide"}</span>
+                <ChevronDown className={`h-3.5 w-3.5 text-slate-500 transition-transform ${agentSelectorOpen ? "rotate-180" : ""}`} />
               </button>
 
               {agentSelectorOpen && (
                 <>
-                  <div
-                    className="fixed inset-0 z-10"
-                    onClick={() => setAgentSelectorOpen(false)}
-                  />
-                  <div className="absolute bottom-full mb-2 left-0 z-20 w-56 rounded-xl bg-slate-950 border border-slate-800 shadow-2xl overflow-hidden">
+                  <div className="fixed inset-0 z-10" onClick={() => setAgentSelectorOpen(false)} />
+                  <div className="absolute bottom-full left-0 z-20 mb-2 w-56 overflow-hidden rounded-2xl border border-white/[0.1] bg-[#0b1929] shadow-2xl">
                     {AGENT_SELECTOR.map((ag) => (
                       <button
                         key={ag.label}
                         type="button"
-                        onClick={() => {
-                          onSelectAgent(ag.id);
-                          setAgentSelectorOpen(false);
-                        }}
-                        className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-xs font-mono transition-all ${
-                          selectedAgentId === ag.id
-                            ? "bg-sky-500/15 text-sky-300"
-                            : "text-slate-300 hover:bg-slate-900"
-                        }`}
+                        onClick={() => { onSelectAgent(ag.id); setAgentSelectorOpen(false); }}
+                        className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-xs transition-all ${selectedAgentId === ag.id ? "bg-cyan-300/10 text-cyan-100" : "text-slate-300 hover:bg-white/[0.06]"}`}
                       >
                         {ag.icon}
                         {ag.label}
-                        {selectedAgentId === ag.id && (
-                          <Check className="w-3.5 h-3.5 ml-auto text-sky-400" />
-                        )}
+                        {selectedAgentId === ag.id && <Check className="ml-auto h-3.5 w-3.5 text-cyan-300" />}
                       </button>
                     ))}
                   </div>
                 </>
               )}
             </div>
-
-            <span className="text-[10px] font-mono text-slate-500 hidden sm:inline">
-              Enter envia • Shift+Enter quebra linha
-            </span>
+            <span className="hidden text-[10px] text-slate-500 sm:inline">A IA confirma antes de ações críticas</span>
           </div>
 
-          <div className="flex items-end gap-2">
-            <div className="relative flex-1">
-              <Textarea
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder={
-                  voice.isEnabled
-                    ? 'Modo voz ativo — ou apenas digite: "Jarvis, status da VPS"'
-                    : "Envie uma instrução para o Jarvis (ex: Criar rota FastAPI, auditar portas da VPS...)"
-                }
-                rows={2}
-                disabled={isStreaming}
-                className="bg-slate-950 border-slate-700 text-slate-100 placeholder:text-slate-500 focus-visible:ring-sky-500 text-sm resize-none pr-12 rounded-xl"
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={voice.toggle}
-                className={`absolute right-2 bottom-2 rounded-lg transition-all ${
-                  voice.isEnabled
-                    ? "text-sky-300 bg-sky-500/15 shadow-[0_0_12px_rgba(56,189,248,0.35)]"
-                    : "text-slate-400 hover:text-sky-400"
-                }`}
-                title={
-                  voice.isEnabled
-                    ? "Sempre escutando: ATIVO — clique para desligar"
-                    : "Ativar modo Sempre Escutando (wake word: Jarvis)"
-                }
-              >
-                {voice.isEnabled ? <Mic className="w-4 h-4 animate-pulse" /> : <MicOff className="w-4 h-4" />}
-              </Button>
-            </div>
-
-            <Button
-              type="submit"
-              disabled={!inputText.trim() || isStreaming}
-              className="h-14 px-5 bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold rounded-xl shadow-lg shadow-sky-950/50 transition-all disabled:opacity-40"
-            >
-              {isStreaming ? (
-                <RefreshCw className="w-5 h-5 animate-spin" />
-              ) : (
-                <Send className="w-5 h-5" />
-              )}
-            </Button>
-          </div>
         </form>
       </div>
     </div>

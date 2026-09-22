@@ -1,4 +1,4 @@
-import { defineHandler, useRuntimeConfig } from "nitro";
+import { defineHandler } from "nitro";
 import { createError, readBody } from "nitro/h3";
 
 interface ChatBody {
@@ -18,8 +18,7 @@ export default defineHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: "Configuração de IA incompleta" });
   }
 
-  const config = useRuntimeConfig();
-  const apiKey = body.apiKey?.trim() || (config as Record<string, string | undefined>).NITRO_DEFAULT_AI_KEY;
+  const apiKey = body.apiKey?.trim();
   const messages = [{ role: "system", content: body.systemPrompt }, ...body.messages.slice(-20)];
   let url = body.baseUrl.replace(/\/$/, "");
   let headers: Record<string, string> = { ...jsonHeaders };

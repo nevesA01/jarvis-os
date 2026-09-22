@@ -3,8 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
 import { readFile, writeFile, readdir } from "node:fs/promises";
-import { spawn } from "node:child_process";
-import { execFile } from "node:child_process";
+import { spawn, execFile } from "node:child_process";
 
 const HOST = "127.0.0.1";
 const PORT = 3210;
@@ -78,6 +77,26 @@ const execute = async (payload) => {
       child.unref();
       return { application, started: true };
     }
+    case "close_application": {
+      const application = requireString(payload.application, "application").replace(/[^a-zA-Z0-9_.-]/g, "");
+      return await new Promise((resolve) => {
+        execFile("taskkill", ["/IM", application, "/T", "/F"], { windowsHide: true, timeout: 30000 }, (error, stdout, stderr) => {
+          resolve({ application, ok: !error, stdout, stderr });
+        });
+      });
+    }
+    case "download_file": {
+      const url = requireString(payload.url, "url");
+      const destination = requireString(payload.destination, "destination");
+      const parsed = new URL(url);
+      if (!/^https?:$/.test(parsed.protocol)) throw new Error("invalid_url_protocol");
+      return await new Promise((resolve, reject) => {
+        execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", "$ProgressPreference='SilentlyContinue'; Invoke-WebRequest -Uri $args[0] -OutFile $args[1]", url, destination], { windowsHide: true, timeout: 120000, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
+          if (error) reject(new Error(stderr || error.message));
+          else resolve({ url, destination, ok: true, stdout });
+        });
+      });
+    }
     case "run_command": {
       const command = requireString(payload.command, "command");
       const cwd = payload.workingDirectory ? requireString(payload.workingDirectory, "working_directory") : process.cwd();
@@ -96,7 +115,7 @@ const server = http.createServer(async (request, response) => {
   if (request.method === "OPTIONS") return send(response, 204, {});
   try {
     if (request.method === "GET" && request.url === "/status") {
-      return send(response, 200, { paired: Boolean(authToken), agentName, capabilities: ["read_file", "write_file", "list_directory", "open_application", "run_command"] });
+      return send(response, 200, { paired: Boolean(authToken), agentName, capabilities: ["read_file", "write_file", "list_directory", "open_application", "close_application", "download_file", "run_command"] });
     }
     if (request.method === "POST" && request.url === "/pair") {
       const body = await readJson(request);

@@ -44,14 +44,6 @@ const WAKE_REGEX = new RegExp(`\\b(${WAKE_WORDS.join("|")})\\b`, "i");
 const SILENCE_MS = 2600;
 const RESTART_DELAY_MS = 180;
 const WAKE_WINDOW_MS = 9000;
-const DEMO_EMIT_MS = 14000;
-
-const DEMO_COMMANDS = [
-  "Verificar o status dos containers Docker na VPS",
-  "Auditar portas abertas no firewall e vulnerabilidades",
-  "Criar uma rota FastAPI com validação Pydantic",
-  "Pesquisar a melhor forma de orquestrar agentes com LangGraph",
-];
 
 const normalize = (s: string) =>
   s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -126,6 +118,7 @@ export const useVoiceEngine = (onCommand: (text: string) => void): UseVoiceEngin
   const enabledRef = useRef(false);
   const suspendedRef = useRef(false);
   const demoRef = useRef(false);
+  const wakeOnlyRef = useRef(true);
   const voiceOutputRef = useRef(voiceOutput);
 
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
@@ -140,6 +133,7 @@ export const useVoiceEngine = (onCommand: (text: string) => void): UseVoiceEngin
   const wakeDetectedAtRef = useRef<number | null>(null);
   const demoIndexRef = useRef(0);
   const demoTimersRef = useRef<number[]>([]);
+  const lastWakeAtRef = useRef(0);
 
   useEffect(() => {
     voiceOutputRef.current = voiceOutput;
@@ -306,16 +300,7 @@ export const useVoiceEngine = (onCommand: (text: string) => void): UseVoiceEngin
         )
       );
     }, 90);
-    const emitTimer = window.setInterval(() => {
-      if (statusRef.current !== "demo") return;
-      const text = DEMO_COMMANDS[demoIndexRef.current % DEMO_COMMANDS.length];
-      demoIndexRef.current += 1;
-      setLastCommand(text);
-      updateStatus("processing");
-      playChime(false);
-      onCommandRef.current(text);
-    }, DEMO_EMIT_MS);
-    demoTimersRef.current = [levelTimer, emitTimer];
+    demoTimersRef.current = [levelTimer];
   }, [playChime, updateStatus]);
 
   /* ---------- Speech recognition lifecycle ---------- */
@@ -363,19 +348,33 @@ export const useVoiceEngine = (onCommand: (text: string) => void): UseVoiceEngin
         return;
       }
 
-      // Wake-word detection on final results
       if (!finalText) return;
-      if (WAKE_REGEX.test(normalize(finalText))) {
-        const remainder = finalText
-          .replace(WAKE_REGEX, " ")
-          .replace(/\s+/g, " ")
-          .trim();
+      const normalizedFinal = normalize(finalText);
+      const now = Date.now();
+      const wakeDetected = WAKE_REGEX.test(normalizedFinal);
+      const wakeWindowActive = lastWakeAtRef.current > 0 && now - lastWakeAtRef.current < WAKE_WINDOW_MS;
+
+      if (wakeDetected) {
+        lastWakeAtRef.current = now;
+        const remainder = finalText.replace(WAKE_REGEX, " ").replace(/\s+/g, " ").trim();
         commandBufferRef.current = remainder;
         updateStatus("command");
         playChime(true);
         setTranscript(remainder);
         resetSilenceTimer();
+        return;
       }
+
+      if (wakeOnlyRef.current && !wakeWindowActive) {
+        setTranscript("");
+        return;
+      }
+
+      commandBufferRef.current = (commandBufferRef.current + " " + finalText)
+        .replace(/\s+/g, " ")
+        .trim();
+      setTranscript(commandBufferRef.current);
+      resetSilenceTimer();
     };
 
     rec.onerror = (e) => {
@@ -517,6 +516,7 @@ export const useVoiceEngine = (onCommand: (text: string) => void): UseVoiceEngin
     speakTokenRef.current += 1;
     if ("speechSynthesis" in window) window.speechSynthesis.cancel();
     commandBufferRef.current = "";
+    lastWakeAtRef.current = 0;
     setTranscript("");
     updateStatus("idle");
   }, [clearDemoTimers, stopLevelMeter, updateStatus]);

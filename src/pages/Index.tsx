@@ -368,7 +368,9 @@ const Index = () => {
       // Jarvis fala a confirmação
       const spoken =
         decision === "approved"
-          ? `Autorização registrada. A ponte local do Windows ainda precisa ser conectada para executar esta ação.`
+          ? target?.details.localAction
+            ? `Autorização registrada. Enviando a ação para o agente Windows agora.`
+            : `Autorização registrada. Este pedido não possui uma ação local vinculada.`
           : `Entendido. Operação cancelada e registrada na memória.`;
       setCaption(spoken);
       voiceRef.current.speakIfEnabled(spoken);
