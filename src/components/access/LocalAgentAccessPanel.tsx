@@ -45,14 +45,14 @@ export const LocalAgentAccessPanel = ({ status, agentName, error, onPair, onDisc
               </span>
             </div>
             <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-300">
-              O pareamento associa este navegador ao agente Windows usando um código temporário de uso único. O agente continua limitado à política de aprovação do Jarvis.
+              O pareamento associa este navegador ao agente Windows usando um código temporário de uso único. O controle local é amplo, mas cada ação ainda precisa da sua aprovação explícita.
             </p>
           </div>
         </div>
 
         <div className="flex shrink-0 items-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-3 py-2 text-xs text-emerald-200">
           <ShieldCheck className="h-4 w-4" />
-          <span>Execução local: protegida</span>
+          <span>Controle local: aprovação obrigatória</span>
         </div>
       </div>
 

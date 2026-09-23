@@ -52,7 +52,7 @@ const requireString = (value, name) => {
 const resolveApplication = (value) => {
   const normalized = value.trim().toLowerCase();
   if (normalized === "whatsapp" || normalized === "whatsapp desktop") {
-    return "shell:AppsFolder\\\\5319275A.WhatsAppDesktop_cv1g1gvanyjgm!App";
+    return "shell:AppsFolder\\5319275A.WhatsAppDesktop_cv1g1gvanyjgm!App";
   }
   return value;
 };

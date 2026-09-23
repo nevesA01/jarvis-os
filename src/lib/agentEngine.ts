@@ -54,9 +54,9 @@ const RESEARCH_KEYWORDS = [
 ];
 const LOCAL_ACTION_KEYWORDS = [
   "meu pc", "meu computador", "windows", "powershell", "cmd", "arquivo", "arquivos",
-  "pasta", "programa", "aplicativo", "processo", "instalar", "abrir", "acessar", "acesse", "navegar", "navegue", "ir para", "vá para", "site", "url", "executar comando",
+  "pasta", "programa", "aplicativo", "processo", "instalar", "abrir", "abra", "iniciar", "inicie", "fechar", "feche", "encerrar", "encerre", "acessar", "acesse", "navegar", "navegue", "ir para", "vá para", "site", "url", "executar comando",
   "execute", "rode", "rodar", "edite", "editar", "modifique", "modificar", "exclua", "apague", "crie", "criar", "salve", "baixar", "download",
-  "crie um projeto", "criar projeto", "editar arquivo", "acesso total",
+  "crie um projeto", "criar projeto", "editar arquivo", "acesso total", "total acesso", "controle total", "controle completo", "acesso completo", "assuma o controle", "dispositivo", "mouse", "teclado", "tela",
 ];
 
 const hasKeyword = (text: string, list: string[]) => list.some((k) => text.includes(k));
@@ -152,6 +152,10 @@ const buildLocalAction = (text: string) => {
   const normalized = text.toLowerCase();
   const path = extractQuotedOrTrailingValue(text, /(?:arquivo|pasta|diret[óo]rio)\s+["“”']?([^"“”']+?)["“”']?(?:\s|$)/i, ".");
 
+  if (/\b(informa(?:ções|cao)|detalhes|status|diagnóstico|diagnostico)\b/.test(normalized) && /computador|pc|sistema|windows|máquina|maquina/.test(normalized)) {
+    return { action: "get_system_info" as const };
+  }
+
   if (/\b(list(ar|e)|mostr(ar|e)|exibir|conte[uú]do)\b/.test(normalized) && /arquivo|pasta|diret[óo]rio|download|desktop/.test(normalized)) {
     return { action: "list_directory" as const, path };
   }
@@ -190,7 +194,7 @@ const buildLocalAction = (text: string) => {
     return { action: "open_application" as const, application: applications[applicationName] || applicationName };
   }
 
-  const closeMatch = text.match(/\b(?:fechar|feche|encerrar|encerre|finalizar|finalize)\s+(?:o|a)?\s*([\w ._-]+?)\s*$/i);
+  const closeMatch = text.match(/\b(?:fechar|feche|encerrar|encerre|finalizar|finalize)\s+(?:o|a)?\s*(?:aplicativo|programa)?\s*([\w ._-]+?)\s*$/i);
   if (closeMatch) {
     const applicationName = closeMatch[1].trim().toLowerCase();
     return { action: "close_application" as const, application: applications[applicationName] || applicationName };
@@ -218,7 +222,7 @@ export const buildAgentResponse = (text: string, analysis: IntentAnalysis): Agen
     return {
       sender: "supervisor",
       senderName: "Supervisor Nexus",
-      content: `🔐 **Ação no computador pausada para sua autorização.**\n\nO Jarvis preparou uma solicitação para o **Agente Local do Windows** e não executará nada antes da sua confirmação (ID: \`${approvalId}\`).\n\nRevise o comando e os arquivos afetados na aba **Aprovações**. Você pode clicar em **Autorizar e Executar** ou dizer **“Jarvis, autorizar”**.`,
+      content: `🔐 **Controle do computador aguardando sua autorização.**\n\nO Jarvis preparou uma solicitação para o **Agente Local do Windows** e não executará nada antes da sua confirmação (ID: \`${approvalId}\`). O agente pode abrir e fechar aplicativos, acessar sites, consultar informações do sistema, ler/listar arquivos, baixar arquivos e executar comandos no Windows.\n\nRevise o comando e os arquivos afetados na aba **Aprovações**. Você pode clicar em **Autorizar e Executar** ou dizer **“Jarvis, autorizar”**. Para controlar outro computador pelo celular, o Jarvis precisa estar aberto no próprio Windows com o agente pareado; o agente atual escuta somente neste computador.`,
       reasoningPlan: {
         intent: analysis.intent,
         delegatedAgent: analysis.targetAgent as any,
