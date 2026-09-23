@@ -8,7 +8,8 @@ export interface LocalAgentRequest {
   [key: string]: unknown;
 }
 
-const LOCAL_AGENT_URL = "http://127.0.0.1:3210";
+const DESKTOP_BRIDGE = (window as Window & { jarvisDesktop?: { isDesktop: boolean } }).jarvisDesktop;
+const LOCAL_AGENT_URL = DESKTOP_BRIDGE?.isDesktop ? "http://127.0.0.1:3211" : "http://127.0.0.1:3210";
 const AGENT_NAME = "Jarvis Local Agent — Windows";
 const REQUEST_TIMEOUT_MS = 8000;
 const TOKEN_STORAGE_KEY = "jarvis.localAgent.token";
@@ -41,6 +42,7 @@ const clearStoredToken = () => {
 interface StatusResponse {
   paired?: boolean;
   agentName?: string;
+  pairingCode?: string;
 }
 
 interface PairResponse {
@@ -67,7 +69,9 @@ const fetchWithTimeout = async (input: RequestInfo | URL, init?: RequestInit) =>
 
 const describeConnectionError = (error: unknown) => {
   if (error instanceof DOMException && error.name === "AbortError") return "O agente local não respondeu em 8 segundos.";
-  if (error instanceof TypeError) return "Não foi possível conectar ao agente local. Abra o Jarvis Local Agent no Windows e mantenha a porta 3210 ativa; o navegador não consegue iniciar esse processo sozinho.";
+  if (error instanceof TypeError) return DESKTOP_BRIDGE?.isDesktop
+    ? "O agente local do Jarvis não respondeu. Feche e abra novamente o aplicativo Windows."
+    : "Não foi possível conectar ao agente local. Inicie o Jarvis Local Agent no Windows e mantenha a porta 3210 ativa.";
   return error instanceof Error ? error.message : "Falha de comunicação com o agente local.";
 };
 
@@ -75,6 +79,7 @@ export const useLocalAgent = () => {
   const [status, setStatus] = useState<LocalAgentStatus>("checking");
   const [agentName, setAgentName] = useState(AGENT_NAME);
   const [error, setError] = useState("");
+  const [desktopPairingCode, setDesktopPairingCode] = useState("");
   const tokenRef = useRef<string | null>(loadStoredToken());
 
   const refresh = useCallback(async () => {
@@ -83,7 +88,13 @@ export const useLocalAgent = () => {
       if (!response.ok) throw new Error(`Agente local indisponível (${response.status})`);
       const data = await response.json() as StatusResponse;
       setAgentName(data.agentName || AGENT_NAME);
-      setStatus(data.paired && tokenRef.current ? "paired" : "disconnected");
+      setDesktopPairingCode(data.pairingCode || "");
+      if (data.paired && tokenRef.current) setStatus("paired");
+      else {
+        tokenRef.current = null;
+        clearStoredToken();
+        setStatus("disconnected");
+      }
       setError("");
     } catch (refreshError) {
       setStatus("disconnected");
@@ -164,6 +175,7 @@ export const useLocalAgent = () => {
     status,
     agentName,
     error,
+    desktopPairingCode,
     pair,
     disconnect,
     execute,

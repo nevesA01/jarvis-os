@@ -14,12 +14,14 @@ interface Props {
   status: LocalAgentStatus;
   agentName: string;
   error: string;
+  desktopPairingCode: string;
+  isDesktop: boolean;
   onPair: (code: string) => void;
   onDisconnect: () => void;
   onRefresh: () => void;
 }
 
-export const LocalAgentAccessPanel = ({ status, agentName, error, onPair, onDisconnect, onRefresh }: Props) => {
+export const LocalAgentAccessPanel = ({ status, agentName, error, desktopPairingCode = "", isDesktop = false, onPair, onDisconnect, onRefresh }: Props) => {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [pairingCode, setPairingCode] = useState("");
   const connected = status === "paired";
@@ -41,11 +43,13 @@ export const LocalAgentAccessPanel = ({ status, agentName, error, onPair, onDisc
               <h2 className="text-sm font-semibold text-white">Acesso ao computador</h2>
               <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-mono font-semibold uppercase tracking-wide ${connected ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200" : "border-amber-400/30 bg-amber-400/10 text-amber-200"}`}>
                 {connected ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
-                {checking ? "Verificando" : connected ? `Pareado: ${agentName}` : "Agente não pareado"}
+                {checking ? "Verificando" : connected ? `Pareado: ${agentName}` : isDesktop ? "Agente integrado, aguardando pareamento" : "Agente não pareado"}
               </span>
             </div>
             <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-300">
-              O pareamento associa este navegador ao agente Windows usando um código temporário de uso único. O controle local é amplo, mas cada ação ainda precisa da sua aprovação explícita. O agente precisa continuar aberto no Windows.
+              {isDesktop
+                ? "O agente Windows já está integrado ao aplicativo e é iniciado junto com ele. O código de uso único abaixo associa esta instalação ao seu Jarvis. Cada ação no computador ainda exige sua aprovação explícita."
+                : "O pareamento associa este navegador ao agente Windows usando um código temporário de uso único. O controle local é amplo, mas cada ação ainda precisa da sua aprovação explícita. O agente precisa continuar aberto no Windows."}
             </p>
           </div>
         </div>
@@ -60,10 +64,10 @@ export const LocalAgentAccessPanel = ({ status, agentName, error, onPair, onDisc
         <div className="mt-4 rounded-xl border border-amber-400/20 bg-amber-950/20 p-3">
           <div className="mb-2 flex items-center justify-between gap-3">
             <label htmlFor="local-agent-pairing-code" className="text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-100">
-              Código exibido no Local Agent
+              {isDesktop ? "Código deste aplicativo" : "Código exibido no Local Agent"}
             </label>
             <button type="button" onClick={onRefresh} className="inline-flex items-center gap-1 text-[11px] text-cyan-200 transition hover:text-white">
-              <RefreshCw className="h-3 w-3" /> Verificar agente
+              <RefreshCw className="h-3 w-3" /> {isDesktop ? "Atualizar código" : "Verificar agente"}
             </button>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -72,18 +76,19 @@ export const LocalAgentAccessPanel = ({ status, agentName, error, onPair, onDisc
               inputMode="numeric"
               autoComplete="one-time-code"
               maxLength={6}
-              value={pairingCode}
+              value={isDesktop && desktopPairingCode ? desktopPairingCode : pairingCode}
+              readOnly={isDesktop}
               onChange={(event) => setPairingCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
               onKeyDown={(event) => {
-                if (event.key === "Enter") void onPair(pairingCode);
+                if (event.key === "Enter") void onPair(isDesktop ? desktopPairingCode : pairingCode);
               }}
-              placeholder="Ex.: 482913"
+              placeholder={isDesktop ? "Carregando código…" : "Ex.: 482913"}
               className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-center font-mono text-sm tracking-[0.35em] text-white outline-none transition focus:border-cyan-300/60 focus:ring-2 focus:ring-cyan-300/20"
             />
             <button
               type="button"
-              disabled={checking || pairingCode.length !== 6}
-              onClick={() => void onPair(pairingCode)}
+              disabled={checking || (isDesktop ? desktopPairingCode.length !== 6 : pairingCode.length !== 6)}
+              onClick={() => void onPair(isDesktop ? desktopPairingCode : pairingCode)}
               className="inline-flex items-center justify-center gap-2 rounded-lg bg-cyan-300 px-4 py-2 text-xs font-bold text-slate-950 transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Link2 className="h-3.5 w-3.5" /> Parear agente

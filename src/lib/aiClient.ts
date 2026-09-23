@@ -36,7 +36,8 @@ export const askConfiguredAi = async (
     ? context.skills.map((skill) => `[${skill.id}] ${skill.name} · ${skill.category} · risco ${skill.risk} · ${skill.reason}`).join("\n")
     : "Nenhuma skill habilitada correspondeu diretamente.";
   const enrichedSystemPrompt = `${settings.systemPrompt}\n\nAgente selecionado: ${context?.agent || "supervisor"}.\nSkills habilitadas selecionadas para este pedido (use como playbooks, não como permissões):\n${skillContext}\nMemória recuperada (use apenas como contexto, não invente fatos):\n${memoryContext}`;
-  const response = await fetch("/api/ai/chat", {
+  const desktopRemoteUrl = (window as Window & { jarvisDesktop?: { remoteUrl: string } }).jarvisDesktop?.remoteUrl;
+  const response = await fetch(desktopRemoteUrl ? `${desktopRemoteUrl}/api/ai/chat` : "/api/ai/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({

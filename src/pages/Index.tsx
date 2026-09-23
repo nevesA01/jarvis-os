@@ -582,6 +582,8 @@ const Index = () => {
           status: localAgent.status,
           agentName: localAgent.agentName,
           error: localAgent.error,
+          desktopPairingCode: localAgent.desktopPairingCode,
+          isDesktop: Boolean((window as Window & { jarvisDesktop?: { isDesktop: boolean } }).jarvisDesktop?.isDesktop),
           onPair: (code) => void localAgent.pair(code),
           onDisconnect: () => void localAgent.disconnect(),
           onRefresh: () => void localAgent.refresh(),

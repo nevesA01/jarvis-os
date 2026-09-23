@@ -63,6 +63,8 @@ interface ConsoleOverlayProps {
     status: "checking" | "disconnected" | "paired" | "error";
     agentName: string;
     error: string;
+    desktopPairingCode: string;
+    isDesktop: boolean;
     onPair: (code: string) => void;
     onDisconnect: () => void;
     onRefresh: () => void;
@@ -181,6 +183,8 @@ const ConsoleOverlay = ({
                     status={localAgent.status}
                     agentName={localAgent.agentName}
                     error={localAgent.error}
+                    desktopPairingCode={localAgent.desktopPairingCode}
+                    isDesktop={Boolean((window as Window & { jarvisDesktop?: { isDesktop: boolean } }).jarvisDesktop?.isDesktop)}
                     onPair={localAgent.onPair}
                     onDisconnect={localAgent.onDisconnect}
                     onRefresh={localAgent.onRefresh}
