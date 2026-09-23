@@ -319,8 +319,8 @@ const JarvisCore = ({
 
       {/* ------- Card de aprovação crítica ------- */}
       {pendingApproval && (
-        <div className="absolute inset-x-0 bottom-8 sm:inset-x-auto sm:right-10 sm:top-24 sm:bottom-auto sm:w-[360px] px-4 sm:px-0 flex justify-center sm:block z-20">
-          <div className="rounded-2xl border border-amber-400/40 bg-[#0a0f1c]/90 backdrop-blur-xl p-5 shadow-2xl shadow-amber-950/40 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="fixed inset-x-0 bottom-4 sm:inset-x-auto sm:right-8 sm:top-24 sm:bottom-auto sm:w-[380px] px-4 sm:px-0 flex justify-center sm:block z-50">
+          <div className="rounded-2xl border border-amber-400/60 bg-[#0a0f1c]/95 backdrop-blur-xl p-5 shadow-2xl shadow-amber-950/60 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="flex items-center gap-2.5 mb-2">
               <div className="w-8 h-8 rounded-xl bg-amber-500/15 border border-amber-400/40 flex items-center justify-center shrink-0">
                 <ShieldCheck className="w-4 h-4 text-amber-300" />

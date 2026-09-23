@@ -42,7 +42,7 @@ const sphereModeFrom = (
   streaming: boolean,
   hasApproval: boolean
 ): CoreStatus => {
-  if (hasApproval && voiceStatus === "idle") return "alert";
+  if (hasApproval) return "alert";
   if (voiceStatus === "speaking") return "speaking";
   if (voiceStatus === "processing" || isThinking || streaming) return "processing";
   if (voiceStatus === "command") return "command";
