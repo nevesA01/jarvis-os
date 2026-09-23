@@ -62,7 +62,7 @@ export interface ChatMessage {
 }
 
 export interface LocalAgentAction {
-  action: "read_file" | "write_file" | "list_directory" | "open_application" | "close_application" | "run_command" | "download_file";
+  action: "read_file" | "write_file" | "list_directory" | "get_system_info" | "open_application" | "close_application" | "run_command" | "download_file";
   path?: string;
   content?: string;
   application?: string;

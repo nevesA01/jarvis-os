@@ -7,6 +7,7 @@ const CAPABILITIES = [
   "Token salvo somente no navegador",
   "Política deny-by-default",
   "Revogação imediata",
+  "Ações exigem aprovação",
 ];
 
 interface Props {

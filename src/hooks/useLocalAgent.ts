@@ -10,7 +10,6 @@ export interface LocalAgentRequest {
 
 const LOCAL_AGENT_URL = "http://127.0.0.1:3210";
 const AGENT_NAME = "Jarvis Local Agent — Windows";
-const PHASE_A_MESSAGE = "O agente local ainda não aceita execuções nesta fase.";
 const TOKEN_STORAGE_KEY = "jarvis.localAgent.token";
 
 const loadStoredToken = () => {
@@ -46,6 +45,12 @@ interface StatusResponse {
 interface PairResponse {
   token?: string;
   agentName?: string;
+  error?: string;
+}
+
+interface ExecuteResponse {
+  ok?: boolean;
+  result?: unknown;
   error?: string;
 }
 
@@ -114,8 +119,28 @@ export const useLocalAgent = () => {
     setError("");
   }, []);
 
-  const execute = useCallback(async (_request: LocalAgentRequest): Promise<never> => {
-    throw new Error(PHASE_A_MESSAGE);
+  const execute = useCallback(async (request: LocalAgentRequest): Promise<unknown> => {
+    const token = tokenRef.current;
+    if (!token) throw new Error("Agente local não está pareado");
+
+    const response = await fetch(`${LOCAL_AGENT_URL}/execute`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(request),
+    });
+    const data = await response.json() as ExecuteResponse;
+    if (!response.ok || !data.ok) {
+      if (response.status === 401) {
+        tokenRef.current = null;
+        clearStoredToken();
+        setStatus("disconnected");
+      }
+      throw new Error(data.error || "O agente local recusou a execução");
+    }
+    return data.result;
   }, []);
 
   return {

@@ -89,6 +89,19 @@ const execute = async (payload) => {
       child.unref();
       return { application, started: true, launcher: executable };
     }
+    case "get_system_info": {
+      return {
+        hostname: os.hostname(),
+        platform: process.platform,
+        release: os.release(),
+        arch: os.arch(),
+        uptimeSeconds: Math.round(os.uptime()),
+        memory: {
+          totalBytes: os.totalmem(),
+          freeBytes: os.freemem(),
+        },
+      };
+    }
     case "close_application": {
       const application = requireString(payload.application, "application").replace(/[^a-zA-Z0-9_.-]/g, "");
       return await new Promise((resolve) => {
@@ -127,7 +140,7 @@ const server = http.createServer(async (request, response) => {
   if (request.method === "OPTIONS") return send(response, 204, {});
   try {
     if (request.method === "GET" && request.url === "/status") {
-      return send(response, 200, { paired: Boolean(authToken), agentName, capabilities: ["read_file", "write_file", "list_directory", "open_application", "close_application", "download_file", "run_command"] });
+      return send(response, 200, { paired: Boolean(authToken), agentName, capabilities: ["read_file", "write_file", "list_directory", "get_system_info", "open_application", "close_application", "download_file", "run_command"] });
     }
     if (request.method === "POST" && request.url === "/pair") {
       const body = await readJson(request);
