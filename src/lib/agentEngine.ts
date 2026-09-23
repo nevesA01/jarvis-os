@@ -54,7 +54,7 @@ const RESEARCH_KEYWORDS = [
 ];
 const LOCAL_ACTION_KEYWORDS = [
   "meu pc", "meu computador", "windows", "powershell", "cmd", "arquivo", "arquivos",
-  "pasta", "programa", "aplicativo", "processo", "instalar", "abrir", "executar comando",
+  "pasta", "programa", "aplicativo", "processo", "instalar", "abrir", "acessar", "acesse", "navegar", "navegue", "ir para", "vá para", "site", "url", "executar comando",
   "execute", "rode", "rodar", "edite", "editar", "modifique", "modificar", "exclua", "apague", "crie", "criar", "salve", "baixar", "download",
   "crie um projeto", "criar projeto", "editar arquivo", "acesso total",
 ];
@@ -158,6 +158,12 @@ const buildLocalAction = (text: string) => {
 
   if (/\b(ler|leia|abrir o arquivo|mostrar o arquivo)\b/.test(normalized)) {
     return { action: "read_file" as const, path };
+  }
+
+  const urlMatch = text.match(/\b(?:abrir|abra|acessar|acesse|navegar para|navegue para|ir para|vá para)\s+(?:o\s+site\s+|a\s+)?(https?:\/\/[^\s]+|www\.[^\s]+|[\w-]+\.(?:com|com\.br|net|org|io)(?:\/[^\s]+)?)/i);
+  if (urlMatch) {
+    const rawUrl = urlMatch[1].replace(/[.,!?;:]+$/, "");
+    return { action: "open_url" as const, url: rawUrl.startsWith("http") ? rawUrl : `https://${rawUrl}` };
   }
 
   const applications: Record<string, string> = {

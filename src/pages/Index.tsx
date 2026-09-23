@@ -175,6 +175,11 @@ const Index = () => {
       const analysis = attachSkillRoutes(text, initialAnalysis, forceAgent);
       const skillRoutes = analysis.skillRoutes || [];
       const memoryRequest = text.match(/^\s*(?:memorize|guarde|lembre|anote|remember)\s*(?:que|:)?\s+(.+)/i);
+      if (analysis.intent === "local_computer_action" && !memoryRequest) {
+        setAgentBusyWith("Aguardando autorização local...");
+        streamAssistantMessage(buildAgentResponse(text, analysis), viaVoice);
+        return;
+      }
       if (memoryRequest) {
         const memory = createLearnedMemory(memoryRequest[1].trim(), ["preferência", viaVoice ? "voz" : "manual"], "Memória ensinada pelo operador");
         setMemories((prev) => [memory, ...prev]);

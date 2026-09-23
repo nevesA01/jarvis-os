@@ -21,7 +21,7 @@ Se o PowerShell estiver em `C:\Windows\System32`, abra a pasta raiz do projeto n
 
 ## Primeiro teste
 
-Depois que o painel mostrar **Conectado**, peça ao Jarvis por voz: “Jarvis, abra o WhatsApp”. A ação será mostrada na fila, e você poderá dizer “Jarvis, autorizar”. O agente resolve o WhatsApp da Microsoft Store via `shell:AppsFolder`; para outras instalações, use o nome do executável conhecido.
+Depois que o painel mostrar **Conectado**, peça ao Jarvis por voz: “Jarvis, abra o WhatsApp” ou “Jarvis, abra https://web.whatsapp.com”. A ação será mostrada na fila, e você poderá dizer “Jarvis, autorizar”. O agente resolve o WhatsApp da Microsoft Store via `shell:AppsFolder`; para outras instalações, use o nome do executável conhecido. A ação `open_url` abre um endereço HTTPS no navegador padrão do Windows.
 
 ## Segurança
 
@@ -31,5 +31,7 @@ Depois que o painel mostrar **Conectado**, peça ao Jarvis por voz: “Jarvis, a
 - O token fica somente no armazenamento local do navegador.
 - O código de pareamento muda ao desconectar o agente.
 - Ações perigosas devem continuar exigindo confirmação explícita no Jarvis.
+- O agente não lê senhas, cookies, conteúdo de abas ou códigos de autenticação do navegador.
+- O controle de navegador nesta fase é abrir URLs no navegador padrão; automação de cliques e formulários exige uma etapa adicional explícita.
 
 Este protótipo não instala serviços, não inicia com o Windows e não concede privilégios administrativos automaticamente.

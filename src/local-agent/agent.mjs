@@ -102,6 +102,14 @@ const execute = async (payload) => {
         },
       };
     }
+    case "open_url": {
+      const rawUrl = requireString(payload.url, "url");
+      const parsed = new URL(rawUrl);
+      if (!/^https?:$/.test(parsed.protocol)) throw new Error("invalid_url_protocol");
+      const child = spawn("cmd.exe", ["/d", "/c", "start", "", parsed.toString()], { detached: true, stdio: "ignore", shell: false, windowsHide: true });
+      child.unref();
+      return { url: parsed.toString(), started: true, launcher: "default_browser" };
+    }
     case "close_application": {
       const application = requireString(payload.application, "application").replace(/[^a-zA-Z0-9_.-]/g, "");
       return await new Promise((resolve) => {
@@ -140,7 +148,7 @@ const server = http.createServer(async (request, response) => {
   if (request.method === "OPTIONS") return send(response, 204, {});
   try {
     if (request.method === "GET" && request.url === "/status") {
-      return send(response, 200, { paired: Boolean(authToken), agentName, capabilities: ["read_file", "write_file", "list_directory", "get_system_info", "open_application", "close_application", "download_file", "run_command"] });
+      return send(response, 200, { paired: Boolean(authToken), agentName, capabilities: ["read_file", "write_file", "list_directory", "get_system_info", "open_application", "close_application", "open_url", "download_file", "run_command"] });
     }
     if (request.method === "POST" && request.url === "/pair") {
       const body = await readJson(request);
