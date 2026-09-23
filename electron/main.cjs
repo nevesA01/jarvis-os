@@ -193,6 +193,10 @@ const startDesktopServer = () => new Promise((resolve, reject) => {
       response.writeHead(403).end();
       return;
     }
+    if (request.method === "POST" && request.headers.origin !== APP_ORIGIN) {
+      response.writeHead(403).end();
+      return;
+    }
     const url = new URL(request.url || "/", APP_ORIGIN);
     try {
       if (request.method === "GET" && url.pathname === "/status") {
