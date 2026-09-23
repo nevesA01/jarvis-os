@@ -21,8 +21,14 @@
       "output": "release"
     },
     "files": [
-      ".output/public/**/*",
       "electron/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": ".output/public",
+        "to": "renderer",
+        "filter": ["**/*"]
+      }
     ],
     "extraMetadata": {
       "main": "electron/main.cjs"

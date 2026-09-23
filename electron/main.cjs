@@ -10,7 +10,9 @@ const HOST = "127.0.0.1";
 const PORT = 3211;
 const APP_ORIGIN = `http://${HOST}:${PORT}`;
 const REMOTE_API = "https://jarvis.kryontech.com.br";
-const ASSETS_DIR = path.join(app.getAppPath(), ".output", "public");
+const ASSETS_DIR = app.isPackaged
+  ? path.join(process.resourcesPath, "renderer")
+  : path.join(app.getAppPath(), ".output", "public");
 const MAX_BODY_BYTES = 2 * 1024 * 1024;
 let authToken = null;
 let pairingCode = "";
