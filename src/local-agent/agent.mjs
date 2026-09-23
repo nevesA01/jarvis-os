@@ -58,6 +58,29 @@ const resolveApplication = (value) => {
   return value;
 };
 
+const waitForChildError = (child) => new Promise((resolve) => {
+  let settled = false;
+  const finish = (result) => {
+    if (settled) return;
+    settled = true;
+    resolve(result);
+  };
+  child.once("error", (error) => finish({ started: false, error: error.message }));
+  child.once("spawn", () => setTimeout(() => finish({ started: true }), 250));
+});
+
+const openInstalledWhatsApp = () => new Promise((resolve, reject) => {
+  const script = "$app = Get-StartApps | Where-Object { $_.Name -like '*WhatsApp*' } | Select-Object -First 1; if ($null -eq $app) { throw 'WhatsApp não está registrado nos aplicativos do Windows' }; Start-Process ('shell:AppsFolder\\' + $app.AppID); Write-Output ($app.Name + '|' + $app.AppID)";
+  execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], { windowsHide: true, timeout: 15000 }, (error, stdout, stderr) => {
+    if (error) {
+      reject(new Error(stderr.trim() || error.message));
+      return;
+    }
+    const [name, appId] = stdout.trim().split("|");
+    resolve({ application: name || "WhatsApp", appId: appId || "", started: true, verified: true, launcher: "Windows Start Apps" });
+  });
+});
+
 const execute = async (payload) => {
   const requestId = requireString(payload.requestId, "request_id");
   if (usedRequestIds.has(requestId)) throw new Error("request_already_used");
@@ -82,13 +105,18 @@ const execute = async (payload) => {
     }
     case "open_application": {
       const requestedApplication = requireString(payload.application, "application");
+      if (["whatsapp", "whatsapp desktop"].includes(requestedApplication.trim().toLowerCase())) {
+        return await openInstalledWhatsApp();
+      }
       const application = resolveApplication(requestedApplication);
       const args = Array.isArray(payload.args) ? payload.args.map((arg) => requireString(arg, "argument")) : [];
       const executable = application.startsWith("shell:") ? "explorer.exe" : application;
       const executableArgs = application.startsWith("shell:") ? [application, ...args] : args;
       const child = spawn(executable, executableArgs, { detached: true, stdio: "ignore", shell: false, windowsHide: false });
+      const launch = await waitForChildError(child);
       child.unref();
-      return { application, started: true, launcher: executable };
+      if (!launch.started) throw new Error(`Não foi possível abrir ${requestedApplication}: ${launch.error}`);
+      return { application, started: true, launcher: executable, verified: true };
     }
     case "get_system_info": {
       return {

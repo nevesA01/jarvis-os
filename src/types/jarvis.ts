@@ -94,6 +94,9 @@ export interface ApprovalRequest {
   };
   approvedAt?: string;
   notes?: string;
+  executionStatus?: "running" | "success" | "failed";
+  executionResult?: string;
+  executionError?: string;
 }
 
 export interface SystemTelemetry {

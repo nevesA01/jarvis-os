@@ -342,11 +342,13 @@ const Index = () => {
       const target = approvals.find((a) => a.id === id);
       if (decision === "approved" && target?.details.localAction) {
         const localAction = target.details.localAction as LocalAgentAction;
+        setApprovals((prev) => prev.map((appr) => appr.id === id ? { ...appr, executionStatus: "running", executionError: undefined } : appr));
         void localAgent.execute({
           requestId: id,
           ...localAction,
         }).then((result) => {
           const resultText = typeof result === "string" ? result : JSON.stringify(result);
+          setApprovals((prev) => prev.map((appr) => appr.id === id ? { ...appr, executionStatus: "success", executionResult: resultText } : appr));
           setMemories((prev) => [createLearnedMemory(
             `A ação autorizada "${target.title}" terminou com sucesso. Resultado observado: ${resultText.slice(0, 500)}`,
             ["execução", target.details.localAction?.action || "ação-local"],
@@ -356,7 +358,7 @@ const Index = () => {
             id: `msg-${Date.now()}-local`,
             sender: "supervisor",
             senderName: "Supervisor Nexus",
-            content: `✅ Ação local executada pelo agente Windows: **${target.title}**.\n\nResultado: \`${resultText.slice(0, 500)}\``,
+            content: `✅ Ação local confirmada pelo agente Windows: **${target.title}**.\n\nResultado: \`${resultText.slice(0, 500)}\``,
             timestamp: nowTime(),
             reasoningPlan: {
               intent: "local_agent_execution",
@@ -370,15 +372,18 @@ const Index = () => {
             toolExecution: {
               toolName: "Jarvis Windows Agent",
               target: target.target,
+              resultSnippet: resultText.slice(0, 500),
               status: "success",
             },
           });
         }).catch((error: unknown) => {
+          const errorText = error instanceof Error ? error.message : "erro desconhecido";
+          setApprovals((prev) => prev.map((appr) => appr.id === id ? { ...appr, executionStatus: "failed", executionError: errorText } : appr));
           appendMessage({
             id: `msg-${Date.now()}-local-error`,
             sender: "supervisor",
             senderName: "Supervisor Nexus",
-            content: `⚠️ A autorização foi registrada, mas o agente Windows não executou a ação: **${error instanceof Error ? error.message : "erro desconhecido"}**.`,
+            content: `⚠️ A autorização foi registrada, mas o agente Windows não confirmou a execução: **${errorText}**. Verifique se o agente continua aberto e tente uma nova solicitação.`,
             timestamp: nowTime(),
             reasoningPlan: {
               intent: "local_agent_execution",

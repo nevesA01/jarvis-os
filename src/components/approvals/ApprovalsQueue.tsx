@@ -327,18 +327,37 @@ export const ApprovalsQueue: React.FC<Props> = ({
                   )}
                 </div>
               ) : (
-                <div
-                  className={`p-4 rounded-xl border text-center font-mono text-xs flex items-center justify-center gap-2 ${
-                    currentApproval.status === "approved"
-                      ? "bg-emerald-950/30 border-emerald-500/30 text-emerald-300"
-                      : "bg-rose-950/30 border-rose-500/30 text-rose-300"
-                  }`}
-                >
+                <div className={`p-4 rounded-xl border text-center font-mono text-xs flex items-center justify-center gap-2 ${
+                  currentApproval.status === "approved"
+                    ? currentApproval.executionStatus === "failed"
+                      ? "bg-rose-950/30 border-rose-500/30 text-rose-300"
+                      : currentApproval.executionStatus === "running"
+                      ? "bg-amber-950/30 border-amber-500/30 text-amber-300"
+                      : "bg-emerald-950/30 border-emerald-500/30 text-emerald-300"
+                    : "bg-rose-950/30 border-rose-500/30 text-rose-300"
+               }`}>
                   {currentApproval.status === "approved" ? (
-                    <>
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                      Ação aprovada e executada com sucesso pelo operador mestre.
-                    </>
+                    currentApproval.executionStatus === "failed" ? (
+                      <>
+                        <XCircle className="w-4 h-4 text-rose-400" />
+                        Autorizada, mas não executada: {currentApproval.executionError}
+                      </>
+                    ) : currentApproval.executionStatus === "running" ? (
+                      <>
+                        <Clock className="w-4 h-4 text-amber-400 animate-pulse" />
+                        Autorizada; aguardando confirmação do agente Windows...
+                      </>
+                    ) : currentApproval.details.localAction ? (
+                      <>
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                        Ação aprovada e confirmada pelo agente Windows.
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                        Solicitação aprovada pelo operador.
+                      </>
+                    )
                   ) : (
                     <>
                       <XCircle className="w-4 h-4 text-rose-400" />

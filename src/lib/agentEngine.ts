@@ -187,8 +187,9 @@ const buildLocalAction = (text: string) => {
     spotify: "Spotify.exe",
     teams: "ms-teams.exe",
     whatsapp: "whatsapp",
+    "whatsapp desktop": "whatsapp",
   };
-  const openMatch = text.match(/\b(?:abrir|abra|iniciar|inicie)\s+(?:o|a)?\s*([\w ._-]+?)(?:\s+(?:por favor|agora|para mim))?\s*$/i);
+  const openMatch = text.match(/\b(?:abrir|abra|iniciar|inicie)\s+(?:o|a)?\s*(?:aplicativo|app|programa)?\s*([\w ._-]+?)(?:\s+(?:por favor|agora|para mim))?\s*$/i);
   if (openMatch) {
     const applicationName = openMatch[1].trim().toLowerCase();
     return { action: "open_application" as const, application: applications[applicationName] || applicationName };
