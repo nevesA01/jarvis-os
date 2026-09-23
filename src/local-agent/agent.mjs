@@ -70,7 +70,7 @@ const waitForChildError = (child) => new Promise((resolve) => {
 });
 
 const openInstalledWhatsApp = () => new Promise((resolve, reject) => {
-  const script = "$app = Get-StartApps | Where-Object { $_.Name -like '*WhatsApp*' } | Select-Object -First 1; if ($null -eq $app) { throw 'WhatsApp não está registrado nos aplicativos do Windows' }; $appPath = 'shell:AppsFolder\\' + $app.AppID; Start-Process -FilePath $appPath; Write-Output ($app.Name + '|' + $app.AppID)";
+  const script = "$app = Get-StartApps | Where-Object { $_.Name -like '*WhatsApp*' } | Select-Object -First 1; if ($null -eq $app) { throw 'WhatsApp não está registrado nos aplicativos do Windows' }; $appPath = 'shell:AppsFolder\\' + $app.AppID; Start-Process -FilePath $appPath -ErrorAction Stop; Write-Output ($app.Name + '|' + $app.AppID)";
   execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], { windowsHide: true, timeout: 15000 }, (error, stdout, stderr) => {
     if (error) {
       reject(new Error(stderr.trim() || error.message));

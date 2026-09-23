@@ -5,6 +5,7 @@ import {
   analyzeIntent,
   attachSkillRoutes,
   buildAgentResponse,
+  buildLocalAction,
   type AgentResponseDraft,
 } from "@/lib/agentEngine";
 import {
@@ -93,6 +94,7 @@ const Index = () => {
 
   const pendingApprovals = approvals.filter((a) => a.status === "pending");
   const pendingApproval = pendingApprovals[0] ?? null;
+  const executionApproval = [...approvals].reverse().find((approval) => approval.executionStatus);
 
   const nowTime = () =>
     new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
@@ -340,18 +342,25 @@ const Index = () => {
       );
 
       const target = approvals.find((a) => a.id === id);
-      if (decision === "approved" && target?.details.localAction) {
-        const localAction = target.details.localAction as LocalAgentAction;
+      const commandText = target?.details.command || "";
+      const localAction = target?.tool === "local_agent_request" && /whats\s*app/i.test(commandText)
+        ? buildLocalAction(commandText)
+        : target?.details.localAction;
+      if (decision === "approved" && target && localAction) {
         setApprovals((prev) => prev.map((appr) => appr.id === id ? { ...appr, executionStatus: "running", executionError: undefined } : appr));
         void localAgent.execute({
           requestId: id,
           ...localAction,
         }).then((result) => {
           const resultText = typeof result === "string" ? result : JSON.stringify(result);
+          const executionResult = result as { ok?: boolean; started?: boolean; error?: string } | null;
+          if (executionResult && (executionResult.ok === false || executionResult.started === false)) {
+            throw new Error(executionResult.error || "O agente não confirmou que o aplicativo foi aberto.");
+          }
           setApprovals((prev) => prev.map((appr) => appr.id === id ? { ...appr, executionStatus: "success", executionResult: resultText } : appr));
           setMemories((prev) => [createLearnedMemory(
             `A ação autorizada "${target.title}" terminou com sucesso. Resultado observado: ${resultText.slice(0, 500)}`,
-            ["execução", target.details.localAction?.action || "ação-local"],
+            ["execução", localAction.action],
             "Execução local aprendida"
           ), ...prev]);
           appendMessage({
@@ -407,9 +416,9 @@ const Index = () => {
         sender: "supervisor",
         senderName: "Supervisor Nexus",
       content:
-        decision === "approved"
-          ? `✅ **Autorização registrada** para o pedido \`${id}\` (${target?.title}).\n\n${target?.details.localAction ? "O pedido foi enviado ao agente local pareado." : "Este pedido é simulado e não possui uma ação local vinculada."}`
-          : `🚫 **Ação rejeitada pelo operador** (\`${id}\`).\n\nO pedido foi cancelado antes de chegar a qualquer agente local. A justificativa "${note ?? "sem justificativa"}" foi registrada na memória episódica.`,
+      decision === "approved"
+        ? `✅ **Autorização registrada** para o pedido \`${id}\` (${target?.title}).\n\n${localAction ? "Enviando agora para o agente local. O resultado da execução aparecerá nesta conversa." : "Este pedido é simulado e não possui uma ação local vinculada."}`
+        : `🚫 **Ação rejeitada pelo operador** (\`${id}\`).\n\nO pedido foi cancelado antes de chegar a qualquer agente local. A justificativa "${note ?? "sem justificativa"}" foi registrada na memória episódica.`,
         timestamp: nowTime(),
         reasoningPlan: {
           intent: "human_in_the_loop_review",
@@ -425,7 +434,7 @@ const Index = () => {
       // Jarvis fala a confirmação
       const spoken =
         decision === "approved"
-          ? target?.details.localAction
+          ? localAction
             ? `Autorização registrada. Enviando a ação para o agente Windows agora.`
             : `Autorização registrada. Este pedido não possui uma ação local vinculada.`
           : `Entendido. Operação cancelada e registrada na memória.`;
@@ -536,6 +545,7 @@ const Index = () => {
         caption={caption}
         agentBusyWith={agentBusyWith}
         pendingApproval={pendingApproval}
+        executionApproval={executionApproval ?? null}
         isSupported={voice.isSupported}
         listeningOn={voice.isEnabled}
         onToggleListening={() => {

@@ -34,6 +34,7 @@ interface JarvisCoreProps {
   caption: string | null;
   agentBusyWith: string | null;
   pendingApproval: ApprovalRequest | null;
+  executionApproval: ApprovalRequest | null;
   isSupported: boolean;
   listeningOn: boolean;
   onToggleListening: () => void;
@@ -67,6 +68,7 @@ const JarvisCore = ({
   caption,
   agentBusyWith,
   pendingApproval,
+  executionApproval,
   isSupported,
   listeningOn,
   onToggleListening,
@@ -318,6 +320,29 @@ const JarvisCore = ({
       </div>
 
       {/* ------- Card de aprovação crítica ------- */}
+      {executionApproval && !pendingApproval && (
+        <div className="fixed inset-x-0 bottom-4 sm:inset-x-auto sm:right-8 sm:top-24 sm:bottom-auto sm:w-[380px] px-4 sm:px-0 flex justify-center sm:block z-50">
+          <div className={`rounded-2xl border p-4 shadow-2xl backdrop-blur-xl ${
+            executionApproval.executionStatus === "success"
+              ? "border-emerald-400/50 bg-emerald-950/90 text-emerald-100"
+              : executionApproval.executionStatus === "failed"
+              ? "border-rose-400/50 bg-rose-950/90 text-rose-100"
+              : "border-amber-400/50 bg-[#0a0f1c]/95 text-amber-100"
+          }`}>
+            <div className="font-mono text-xs font-bold tracking-widest">
+              {executionApproval.executionStatus === "success"
+                ? "AÇÃO EXECUTADA"
+                : executionApproval.executionStatus === "failed"
+                ? "FALHA NA EXECUÇÃO"
+                : "ENVIANDO PARA O AGENTE WINDOWS"}
+            </div>
+            <div className="mt-1 text-sm font-semibold">{executionApproval.title}</div>
+            {executionApproval.executionError && (
+              <p className="mt-2 text-xs leading-relaxed">{executionApproval.executionError}</p>
+            )}
+          </div>
+        </div>
+      )}
       {pendingApproval && (
         <div className="fixed inset-x-0 bottom-4 sm:inset-x-auto sm:right-8 sm:top-24 sm:bottom-auto sm:w-[380px] px-4 sm:px-0 flex justify-center sm:block z-50">
           <div className="rounded-2xl border border-amber-400/60 bg-[#0a0f1c]/95 backdrop-blur-xl p-5 shadow-2xl shadow-amber-950/60 animate-in fade-in slide-in-from-bottom-4 duration-500">

@@ -54,7 +54,7 @@ const RESEARCH_KEYWORDS = [
 ];
 const LOCAL_ACTION_KEYWORDS = [
   "meu pc", "meu computador", "windows", "powershell", "cmd", "arquivo", "arquivos",
-  "pasta", "programa", "aplicativo", "processo", "instalar", "abrir", "abra", "iniciar", "inicie", "fechar", "feche", "encerrar", "encerre", "acessar", "acesse", "navegar", "navegue", "ir para", "vá para", "site", "url", "executar comando",
+  "pasta", "programa", "aplicativo", "processo", "instalar", "abrir", "abra", "abre", "iniciar", "inicie", "inicia", "fechar", "feche", "encerrar", "encerre", "acessar", "acesse", "navegar", "navegue", "ir para", "vá para", "site", "url", "executar comando",
   "execute", "rode", "rodar", "edite", "editar", "modifique", "modificar", "exclua", "apague", "crie", "criar", "salve", "baixar", "download",
   "crie um projeto", "criar projeto", "editar arquivo", "acesso total", "total acesso", "controle total", "controle completo", "acesso completo", "assuma o controle", "dispositivo", "mouse", "teclado", "tela",
 ];
@@ -148,9 +148,14 @@ const extractQuotedOrTrailingValue = (text: string, pattern: RegExp, fallback: s
   return match?.[1]?.trim() || fallback;
 };
 
-const buildLocalAction = (text: string) => {
+export const buildLocalAction = (text: string) => {
   const normalized = text.toLowerCase();
   const path = extractQuotedOrTrailingValue(text, /(?:arquivo|pasta|diret[óo]rio)\s+["“”']?([^"“”']+?)["“”']?(?:\s|$)/i, ".");
+
+  if (/\b(whats\s*app|whatsapp)\b/i.test(text)) {
+    const isClose = /\b(fechar|feche|encerrar|encerre|finalizar|finalize)\b/i.test(text);
+    return { action: isClose ? "close_application" as const : "open_application" as const, application: "whatsapp" };
+  }
 
   if (/\b(informa(?:ções|cao)|detalhes|status|diagnóstico|diagnostico)\b/.test(normalized) && /computador|pc|sistema|windows|máquina|maquina/.test(normalized)) {
     return { action: "get_system_info" as const };
@@ -189,9 +194,9 @@ const buildLocalAction = (text: string) => {
     whatsapp: "whatsapp",
     "whatsapp desktop": "whatsapp",
   };
-  const openMatch = text.match(/\b(?:abrir|abra|iniciar|inicie)\s+(?:o|a)?\s*(?:aplicativo|app|programa)?\s*([\w ._-]+?)(?:\s+(?:por favor|agora|para mim))?\s*$/i);
+  const openMatch = text.match(/\b(?:abrir|abra|iniciar|inicie)\s+(?:o|a)?\s*(?:aplicativo|app|programa)?\s*([\w ._-]+?)(?:\s+(?:por favor|agora|para mim))?\s*[.!?]?\s*$/i);
   if (openMatch) {
-    const applicationName = openMatch[1].trim().toLowerCase();
+    const applicationName = openMatch[1].trim().toLowerCase().replace(/\s+/g, " ");
     return { action: "open_application" as const, application: applications[applicationName] || applicationName };
   }
 
