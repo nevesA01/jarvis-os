@@ -10,6 +10,7 @@ export interface LocalAgentRequest {
 
 const LOCAL_AGENT_URL = "http://127.0.0.1:3210";
 const AGENT_NAME = "Jarvis Local Agent — Windows";
+const REQUEST_TIMEOUT_MS = 8000;
 const TOKEN_STORAGE_KEY = "jarvis.localAgent.token";
 
 const loadStoredToken = () => {
@@ -54,6 +55,22 @@ interface ExecuteResponse {
   error?: string;
 }
 
+const fetchWithTimeout = async (input: RequestInfo | URL, init?: RequestInit) => {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal, cache: "no-store" });
+  } finally {
+    window.clearTimeout(timeout);
+  }
+};
+
+const describeConnectionError = (error: unknown) => {
+  if (error instanceof DOMException && error.name === "AbortError") return "O agente local não respondeu em 8 segundos.";
+  if (error instanceof TypeError) return "Não foi possível conectar ao agente local. Abra o Jarvis Local Agent no Windows e mantenha a porta 3210 ativa; o navegador não consegue iniciar esse processo sozinho.";
+  return error instanceof Error ? error.message : "Falha de comunicação com o agente local.";
+};
+
 export const useLocalAgent = () => {
   const [status, setStatus] = useState<LocalAgentStatus>("checking");
   const [agentName, setAgentName] = useState(AGENT_NAME);
@@ -62,15 +79,15 @@ export const useLocalAgent = () => {
 
   const refresh = useCallback(async () => {
     try {
-      const response = await fetch(`${LOCAL_AGENT_URL}/status`, { cache: "no-store" });
-      if (!response.ok) throw new Error("Agente local indisponível");
+      const response = await fetchWithTimeout(`${LOCAL_AGENT_URL}/status`, { cache: "no-store" });
+      if (!response.ok) throw new Error(`Agente local indisponível (${response.status})`);
       const data = await response.json() as StatusResponse;
       setAgentName(data.agentName || AGENT_NAME);
       setStatus(data.paired && tokenRef.current ? "paired" : "disconnected");
       setError("");
-    } catch {
+    } catch (refreshError) {
       setStatus("disconnected");
-      setError("Inicie o Local Agent no computador e tente novamente.");
+      setError(describeConnectionError(refreshError));
     }
   }, []);
 
@@ -89,7 +106,7 @@ export const useLocalAgent = () => {
     setStatus("checking");
     setError("");
     try {
-      const response = await fetch(`${LOCAL_AGENT_URL}/pair`, {
+      const response = await fetchWithTimeout(`${LOCAL_AGENT_URL}/pair`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pairingCode: normalizedCode }),
@@ -102,13 +119,13 @@ export const useLocalAgent = () => {
       setStatus("paired");
     } catch (pairError) {
       setStatus("error");
-      setError(pairError instanceof Error ? pairError.message : "Não foi possível parear o agente.");
+      setError(describeConnectionError(pairError));
     }
   }, []);
 
   const disconnect = useCallback(async () => {
     if (tokenRef.current) {
-      await fetch(`${LOCAL_AGENT_URL}/disconnect`, {
+      await fetchWithTimeout(`${LOCAL_AGENT_URL}/disconnect`, {
         method: "POST",
         headers: { Authorization: `Bearer ${tokenRef.current}` },
       }).catch(() => undefined);
@@ -123,7 +140,7 @@ export const useLocalAgent = () => {
     const token = tokenRef.current;
     if (!token) throw new Error("Agente local não está pareado");
 
-    const response = await fetch(`${LOCAL_AGENT_URL}/execute`, {
+    const response = await fetchWithTimeout(`${LOCAL_AGENT_URL}/execute`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -138,7 +155,7 @@ export const useLocalAgent = () => {
         clearStoredToken();
         setStatus("disconnected");
       }
-      throw new Error(data.error || "O agente local recusou a execução");
+      throw new Error(data.error || `O agente local recusou a execução (${response.status})`);
     }
     return data.result;
   }, []);

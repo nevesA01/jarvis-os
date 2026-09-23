@@ -45,7 +45,7 @@ export const LocalAgentAccessPanel = ({ status, agentName, error, onPair, onDisc
               </span>
             </div>
             <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-300">
-              O pareamento associa este navegador ao agente Windows usando um código temporário de uso único. O controle local é amplo, mas cada ação ainda precisa da sua aprovação explícita.
+              O pareamento associa este navegador ao agente Windows usando um código temporário de uso único. O controle local é amplo, mas cada ação ainda precisa da sua aprovação explícita. O agente precisa continuar aberto no Windows.
             </p>
           </div>
         </div>

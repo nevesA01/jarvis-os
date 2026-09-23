@@ -41,9 +41,10 @@ interface SpeechRecognitionLike extends EventTarget {
 
 const WAKE_WORDS = ["jarvis", "jervis", "jarves", "jarvic", "jar vis"];
 const WAKE_REGEX = new RegExp(`\\b(${WAKE_WORDS.join("|")})\\b`, "i");
-const SILENCE_MS = 2600;
-const RESTART_DELAY_MS = 180;
-const WAKE_WINDOW_MS = 9000;
+const SILENCE_MS = 4200;
+const RESTART_DELAY_MS = 320;
+const WAKE_WINDOW_MS = 12000;
+const AUTO_LISTEN_KEY = "jarvis.voice.autoListen";
 
 const normalize = (s: string) =>
   s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -120,6 +121,8 @@ export const useVoiceEngine = (onCommand: (text: string) => void): UseVoiceEngin
   const demoRef = useRef(false);
   const wakeOnlyRef = useRef(true);
   const voiceOutputRef = useRef(voiceOutput);
+  const restartCountRef = useRef(0);
+  const permissionErrorRef = useRef(false);
 
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -380,14 +383,19 @@ export const useVoiceEngine = (onCommand: (text: string) => void): UseVoiceEngin
     rec.onerror = (e) => {
       const err = (e as any).error;
       if (err === "not-allowed" || err === "service-not-allowed") {
+        permissionErrorRef.current = true;
         clearDemoTimers();
         enterDemo();
+        return;
       }
-      // "no-speech" / "network": onend handles the restart
+      if (err === "aborted") return;
+      restartCountRef.current += 1;
+      // Chrome encerra a sessão em no-speech/network; onend faz a reconexão.
     };
 
     rec.onend = () => {
-      if (!enabledRef.current || suspendedRef.current || demoRef.current) return;
+      if (!enabledRef.current || suspendedRef.current || demoRef.current || permissionErrorRef.current) return;
+      restartCountRef.current = 0;
       restartRecognition();
     };
 
@@ -474,9 +482,16 @@ export const useVoiceEngine = (onCommand: (text: string) => void): UseVoiceEngin
   /* ---------- Public controls ---------- */
   const start = useCallback(() => {
     enabledRef.current = true;
+    permissionErrorRef.current = false;
+    restartCountRef.current = 0;
+    try {
+      window.localStorage.setItem(AUTO_LISTEN_KEY, "1");
+    } catch {
+      // A escuta continua ativa durante a sessão mesmo sem persistência.
+    }
     ensureAudioCtx();
     updateStatus("requesting");
-    startLevelMeter();
+    void startLevelMeter();
 
     if (!isSupported) {
       enterDemo();
@@ -500,6 +515,13 @@ export const useVoiceEngine = (onCommand: (text: string) => void): UseVoiceEngin
     enabledRef.current = false;
     suspendedRef.current = false;
     demoRef.current = false;
+    permissionErrorRef.current = false;
+    restartCountRef.current = 0;
+    try {
+      window.localStorage.removeItem(AUTO_LISTEN_KEY);
+    } catch {
+      // noop
+    }
     clearSilence();
     clearDemoTimers();
     if (restartTimerRef.current !== null) {
@@ -525,6 +547,30 @@ export const useVoiceEngine = (onCommand: (text: string) => void): UseVoiceEngin
     if (enabledRef.current) stop();
     else start();
   }, [start, stop]);
+
+  useEffect(() => {
+    let autoListen = false;
+    try {
+      autoListen = window.localStorage.getItem(AUTO_LISTEN_KEY) === "1";
+    } catch {
+      autoListen = false;
+    }
+    if (autoListen && isSupported) start();
+  }, [isSupported, start]);
+
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible" && enabledRef.current && !suspendedRef.current && !demoRef.current) {
+        restartRecognition();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("focus", handleVisibility);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("focus", handleVisibility);
+    };
+  }, [restartRecognition]);
 
   const toggleVoiceOutput = useCallback(() => {
     setVoiceOutput((v) => {

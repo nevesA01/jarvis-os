@@ -82,6 +82,13 @@ const Index = () => {
   const [aiSettings, setAiSettings] = useState(loadAiSettings);
   const localAgent = useLocalAgent();
   const captionTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      if (localAgent.status !== "paired") void localAgent.refresh();
+    }, 15000);
+    return () => window.clearInterval(timer);
+  }, [localAgent.refresh, localAgent.status]);
   const streamTimerRef = useRef<number | null>(null);
 
   const pendingApprovals = approvals.filter((a) => a.status === "pending");
