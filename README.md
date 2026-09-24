@@ -35,7 +35,9 @@ O `Dockerfile` deste repositório faz um build multiestágio:
 
 ### Pontos de atenção no Dokploy
 
-- Configure a porta do serviço/domínio no Dokploy para **3000** (porta interna do Nginx).
+- Configure a porta do serviço/domínio no Dokploy para **3000** (porta interna do Node/Nitro).
 - Configure o domínio `jarvis.kryontech.com.br` apontando para o container.
+- Monte um volume persistente do Dokploy em `/app/downloads` e coloque nele o arquivo `Jarvis-OS-Setup-latest.exe`.
+- Defina `JARVIS_DESKTOP_VERSION` com a versão publicada, por exemplo `1.0.3`. A URL do instalador já é `https://jarvis.kryontech.com.br/downloads/Jarvis-OS-Setup-latest.exe`.
 - Microfone (wake word “Jarvis”) exige **HTTPS** com certificado válido.
-- Se aparecer `Bad Gateway`, o container do Nginx provavelmente não está rodando — verifique os logs do container no Dokploy.
+- Se aparecer `Bad Gateway`, o container do app provavelmente não está rodando — verifique os logs do container no Dokploy.

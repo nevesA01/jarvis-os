@@ -2,20 +2,32 @@
 
 O desktop é empacotado como um aplicativo Electron. A janela abre a aplicação hospedada em `https://jarvis.kryontech.com.br`, enquanto o agente local roda no próprio Windows dentro do aplicativo.
 
-## Atualizações sem GitHub
+## Hospedagem no Dokploy
 
-O aplicativo consulta `https://jarvis.kryontech.com.br/api/desktop-update` ao iniciar. Quando o servidor informa uma versão maior que a instalada, o Jarvis mostra uma confirmação e abre o instalador oficial no domínio do Jarvis. O código-fonte pode permanecer privado e não é necessário criar repositório público, token ou release no GitHub.
+O próprio servidor do Jarvis entrega o instalador. O endpoint estável é:
 
-Configure no servidor hospedado:
+`https://jarvis.kryontech.com.br/downloads/Jarvis-OS-Setup-latest.exe`
 
-- `JARVIS_DESKTOP_VERSION`: versão mais recente publicada, por exemplo `1.0.3`.
-- `JARVIS_DESKTOP_INSTALLER_URL`: URL HTTPS do instalador hospedado no próprio domínio, por exemplo `https://jarvis.kryontech.com.br/downloads/Jarvis-OS-Setup-latest.exe`.
+No Dokploy, faça o seguinte:
 
-A URL do instalador deve permanecer no mesmo domínio configurado no Electron. Isso impede que uma resposta comprometida redirecione o usuário para um executável de outro site.
+1. Abra o serviço do Jarvis e adicione um volume persistente montado em `/app/downloads`.
+2. Gere o instalador Windows pelo processo de build desktop do projeto.
+3. Renomeie o arquivo gerado para `Jarvis-OS-Setup-latest.exe`.
+4. Envie esse arquivo para a pasta do volume que o Dokploy monta em `/app/downloads`.
+5. Nas variáveis de ambiente do serviço, configure `JARVIS_DESKTOP_VERSION` com a versão do instalador, por exemplo `1.0.3`.
+6. Configure `JARVIS_DESKTOP_INSTALLER_URL` como `https://jarvis.kryontech.com.br/downloads/Jarvis-OS-Setup-latest.exe`, ou deixe o valor padrão.
+7. Faça o redeploy do serviço.
+
+Teste no navegador:
+
+- `https://jarvis.kryontech.com.br/api/desktop-update` deve responder JSON com `version` e `installerUrl`.
+- `https://jarvis.kryontech.com.br/downloads/Jarvis-OS-Setup-latest.exe` deve iniciar o download do instalador.
+
+Para publicar uma atualização, gere o novo `.exe`, substitua o arquivo no volume persistente, altere `JARVIS_DESKTOP_VERSION` e faça o redeploy. O código-fonte e o repositório GitHub podem continuar privados. Não remova o volume persistente, pois o arquivo seria perdido durante a recriação do container.
 
 ## Criar o instalador
 
-Execute `npm run desktop:win`. O arquivo `release/Jarvis-OS-Setup-1.0.2.exe` será gerado. Hospede uma cópia com nome estável no caminho configurado em `JARVIS_DESKTOP_INSTALLER_URL`. Para publicar uma atualização, gere um novo instalador, substitua o arquivo hospedado e altere `JARVIS_DESKTOP_VERSION` no servidor.
+Execute `npm run desktop:win`. O arquivo `release/Jarvis-OS-Setup-1.0.2.exe` será gerado. O workflow do Windows continua disponível para gerar e testar o artefato, mas a publicação do instalador é feita no volume do Dokploy.
 
 ## Usar
 

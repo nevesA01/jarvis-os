@@ -14,6 +14,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 COPY --from=build /app/.output ./.output
+RUN mkdir -p /app/downloads
 
 EXPOSE 3000
 
