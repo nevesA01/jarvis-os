@@ -1,5 +1,4 @@
 const { app, BrowserWindow, dialog, shell } = require("electron");
-const { autoUpdater } = require("electron-updater");
 const http = require("node:http");
 const path = require("node:path");
 const crypto = require("node:crypto");
@@ -11,6 +10,7 @@ const HOST = "127.0.0.1";
 const PORT = 3211;
 const APP_ORIGIN = `http://${HOST}:${PORT}`;
 const REMOTE_API = "https://jarvis.kryontech.com.br";
+const DESKTOP_UPDATE_URL = `${REMOTE_API}/api/desktop-update`;
 const ASSETS_DIR = app.isPackaged
   ? path.join(process.resourcesPath, "renderer")
   : path.join(app.getAppPath(), ".output", "public");
@@ -298,39 +298,48 @@ const createWindow = async () => {
   return mainWindow;
 };
 
-const setupAutoUpdates = (mainWindow) => {
+const compareVersions = (left, right) => {
+  const parse = (value) => String(value).replace(/^v/i, "").split(".").map((part) => Number.parseInt(part, 10) || 0);
+  const a = parse(left);
+  const b = parse(right);
+  for (let index = 0; index < Math.max(a.length, b.length); index += 1) {
+    if ((a[index] || 0) !== (b[index] || 0)) return (a[index] || 0) - (b[index] || 0);
+  }
+  return 0;
+};
+
+const setupAutoUpdates = async (mainWindow) => {
   if (!app.isPackaged) return;
 
-  autoUpdater.autoDownload = false;
-  autoUpdater.autoInstallOnAppQuit = false;
-  autoUpdater.on("update-available", async (update) => {
-    const { response } = await dialog.showMessageBox(mainWindow, {
+  try {
+    const response = await fetch(DESKTOP_UPDATE_URL, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!response.ok) throw new Error(`update_server_${response.status}`);
+    const update = await response.json();
+    if (!update?.version || !update?.installerUrl || compareVersions(update.version, app.getVersion()) <= 0) return;
+
+    const { response: choice } = await dialog.showMessageBox(mainWindow, {
       type: "info",
       title: "Atualização do Jarvis disponível",
-      message: `A versão ${update.version} está disponível. Deseja baixar e instalar agora?`,
+      message: `A versão ${update.version} está disponível. Deseja baixar o instalador agora?`,
+      detail: "O Jarvis abrirá o download oficial no navegador. Feche o aplicativo e execute o instalador quando o download terminar.",
       buttons: ["Baixar atualização", "Lembrar depois"],
       defaultId: 0,
       cancelId: 1,
       noLink: true,
     });
-    if (response === 0) autoUpdater.downloadUpdate().catch(() => {});
-  });
-  autoUpdater.on("update-downloaded", async (update) => {
-    const { response } = await dialog.showMessageBox(mainWindow, {
-      type: "info",
-      title: "Atualização pronta",
-      message: `A versão ${update.version} foi baixada. Reinicie o Jarvis para concluir a instalação.`,
-      buttons: ["Reiniciar agora", "Mais tarde"],
-      defaultId: 0,
-      cancelId: 1,
-      noLink: true,
-    });
-    if (response === 0) autoUpdater.quitAndInstall();
-  });
-  autoUpdater.on("error", (error) => {
-    console.error("Falha ao verificar ou baixar atualização do Jarvis:", error);
-  });
-  autoUpdater.checkForUpdates();
+    if (choice === 0) {
+      const installerUrl = new URL(update.installerUrl);
+      if (!/^https:$/.test(installerUrl.protocol) || installerUrl.origin !== new URL(REMOTE_API).origin) {
+        throw new Error("invalid_installer_url");
+      }
+      await shell.openExternal(installerUrl.toString());
+    }
+  } catch (error) {
+    console.error("Falha ao verificar atualização do Jarvis:", error);
+  }
 };
 
 app.whenReady().then(async () => {

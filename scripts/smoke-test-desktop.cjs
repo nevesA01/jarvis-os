@@ -51,10 +51,6 @@ const run = async () => {
     await stat(path.join(rendererPath, jsPath.slice(1)));
     await stat(path.join(rendererPath, cssPath.slice(1)));
 
-    const appUpdateConfig = await readFile(path.join(resourcesPath, "app-update.yml"), "utf8");
-    assert.match(appUpdateConfig, /provider:\s*generic/);
-    assert.match(appUpdateConfig, /url:\s*https:\/\/github\.com\/nevesA01\/jarvis-os-updates\/releases\/latest\/download/);
-
     child = spawn(installedExecutable, ["--disable-gpu"], { stdio: "ignore", windowsHide: false });
     await new Promise((resolve, reject) => {
       child.once("spawn", resolve);
