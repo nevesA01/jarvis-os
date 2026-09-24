@@ -1,4 +1,5 @@
 const { app, BrowserWindow, dialog, shell } = require("electron");
+const { autoUpdater } = require("electron-updater");
 const http = require("node:http");
 const path = require("node:path");
 const crypto = require("node:crypto");
@@ -294,6 +295,42 @@ const createWindow = async () => {
     return { action: "deny" };
   });
   await mainWindow.loadURL(APP_ORIGIN);
+  return mainWindow;
+};
+
+const setupAutoUpdates = (mainWindow) => {
+  if (!app.isPackaged) return;
+
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = false;
+  autoUpdater.on("update-available", async (update) => {
+    const { response } = await dialog.showMessageBox(mainWindow, {
+      type: "info",
+      title: "Atualização do Jarvis disponível",
+      message: `A versão ${update.version} está disponível. Deseja baixar e instalar agora?`,
+      buttons: ["Baixar atualização", "Lembrar depois"],
+      defaultId: 0,
+      cancelId: 1,
+      noLink: true,
+    });
+    if (response === 0) autoUpdater.downloadUpdate().catch(() => {});
+  });
+  autoUpdater.on("update-downloaded", async (update) => {
+    const { response } = await dialog.showMessageBox(mainWindow, {
+      type: "info",
+      title: "Atualização pronta",
+      message: `A versão ${update.version} foi baixada. Reinicie o Jarvis para concluir a instalação.`,
+      buttons: ["Reiniciar agora", "Mais tarde"],
+      defaultId: 0,
+      cancelId: 1,
+      noLink: true,
+    });
+    if (response === 0) autoUpdater.quitAndInstall();
+  });
+  autoUpdater.on("error", (error) => {
+    console.error("Falha ao verificar ou baixar atualização do Jarvis:", error);
+  });
+  autoUpdater.checkForUpdates();
 };
 
 app.whenReady().then(async () => {
@@ -307,7 +344,8 @@ app.whenReady().then(async () => {
     return;
   }
   app.on("before-quit", () => server.close());
-  await createWindow();
+  const mainWindow = await createWindow();
+  setupAutoUpdates(mainWindow);
 });
 
 app.on("window-all-closed", () => {

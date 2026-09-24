@@ -1,6 +1,6 @@
 {
   "name": "jarvis-os",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "type": "module",
   "main": "electron/main.cjs",
@@ -12,7 +12,8 @@
     "preview": "vite preview",
     "start": "node .output/server/index.mjs",
     "desktop:dev": "npm run build && electron .",
-    "desktop:win": "cross-env CSC_IDENTITY_AUTO_DISCOVERY=false npm run build && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win nsis --publish never"
+    "desktop:win": "cross-env CSC_IDENTITY_AUTO_DISCOVERY=false npm run build && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win nsis --publish never",
+    "desktop:smoke": "node scripts/smoke-test-desktop.cjs"
   },
   "build": {
     "appId": "br.com.kryontech.jarvis",
@@ -27,7 +28,9 @@
       {
         "from": ".output/public",
         "to": "renderer",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "extraMetadata": {
@@ -39,6 +42,14 @@
       ],
       "artifactName": "Jarvis-OS-Setup-${version}.${ext}"
     },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "nevesA01",
+        "repo": "jarvis-os",
+        "releaseType": "release"
+      }
+    ],
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
@@ -82,6 +93,7 @@
     "cmdk": "^1.0.0",
     "cross-env": "^10.1.0",
     "date-fns": "^3.6.0",
+    "electron-updater": "^6.8.9",
     "embla-carousel-react": "^8.3.0",
     "input-otp": "^1.2.4",
     "jiti": "^2.7.0",
@@ -110,10 +122,10 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react-swc": "^4.3.0",
     "autoprefixer": "^10.4.20",
-    "eslint": "^9.9.0",
-    "eslint-plugin-react-hooks": "^5.1.0-rc.0",
     "electron": "^44.4.3",
     "electron-builder": "^26.15.3",
+    "eslint": "^9.9.0",
+    "eslint-plugin-react-hooks": "^5.1.0-rc.0",
     "eslint-plugin-react-refresh": "^0.4.9",
     "globals": "^15.9.0",
     "postcss": "^8.4.47",
