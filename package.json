@@ -1,6 +1,6 @@
 {
   "name": "jarvis-os",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "private": true,
   "type": "module",
   "main": "electron/main.cjs",
@@ -44,10 +44,9 @@
     },
     "publish": [
       {
-        "provider": "github",
-        "owner": "nevesA01",
-        "repo": "jarvis-os",
-        "releaseType": "release"
+        "provider": "generic",
+        "url": "https://github.com/nevesA01/jarvis-os-updates/releases/latest/download",
+        "channel": "latest"
       }
     ],
     "nsis": {
