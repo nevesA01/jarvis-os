@@ -11,8 +11,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "start": "node .output/server/index.mjs",
-    "desktop:dev": "npm run build && node scripts/stage-desktop-renderer.cjs && electron .",
-    "desktop:win": "cross-env CSC_IDENTITY_AUTO_DISCOVERY=false npm run build && node scripts/stage-desktop-renderer.cjs && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win nsis --publish never",
+    "desktop:dev": "npm run build && electron .",
+    "desktop:win": "cross-env CSC_IDENTITY_AUTO_DISCOVERY=false npm run build && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win nsis --publish never",
     "desktop:smoke": "node scripts/smoke-test-desktop.cjs"
   },
   "build": {
@@ -26,7 +26,7 @@
     ],
     "extraResources": [
       {
-        "from": "dist",
+        "from": ".output/public",
         "to": "renderer",
         "filter": [
           "**/*"
