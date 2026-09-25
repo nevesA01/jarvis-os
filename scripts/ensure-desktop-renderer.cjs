@@ -2,7 +2,7 @@ const { cp, mkdir, readFile, rm, writeFile } = require("node:fs/promises");
 const path = require("node:path");
 
 module.exports = async ({ appOutDir }) => {
-  const source = path.resolve(__dirname, "..", ".output", "public");
+  const source = path.resolve(__dirname, "..", "dist", "desktop-renderer");
   const sourceIndex = path.join(source, "index.html");
   await readFile(sourceIndex).catch((error) => {
     throw new Error(`Built renderer is missing at ${sourceIndex}: ${error.message}`);

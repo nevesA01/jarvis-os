@@ -8,11 +8,12 @@
     "dev": "vite",
     "build": "vite build",
     "build:dev": "vite build --mode development",
+    "build:desktop-renderer": "vite build --config vite.desktop.config.ts",
     "lint": "eslint .",
     "preview": "vite preview",
     "start": "node .output/server/index.mjs",
-    "desktop:dev": "npm run build && electron .",
-    "desktop:win": "node scripts/clean-desktop-release.cjs && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false npm run build && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win nsis --publish never",
+    "desktop:dev": "npm run build && npm run build:desktop-renderer && electron .",
+    "desktop:win": "node scripts/clean-desktop-release.cjs && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false npm run build && npm run build:desktop-renderer && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win nsis --publish never",
     "desktop:smoke": "node scripts/smoke-test-desktop.cjs"
   },
   "build": {

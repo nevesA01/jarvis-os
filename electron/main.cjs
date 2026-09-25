@@ -13,7 +13,7 @@ const REMOTE_API = "https://jarvis.kryontech.com.br";
 const DESKTOP_UPDATE_URL = `${REMOTE_API}/api/desktop-update`;
 const ASSETS_DIR = app.isPackaged
   ? path.join(process.resourcesPath, "renderer")
-  : path.join(app.getAppPath(), ".output", "public");
+  : path.join(app.getAppPath(), "dist", "desktop-renderer");
 const MAX_BODY_BYTES = 2 * 1024 * 1024;
 let authToken = null;
 let pairingCode = "";
