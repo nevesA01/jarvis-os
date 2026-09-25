@@ -290,6 +290,24 @@ const createWindow = async () => {
       sandbox: true,
     },
   });
+  const session = mainWindow.webContents.session;
+  session.setPermissionCheckHandler((_webContents, permission, requestingOrigin) => {
+    return requestingOrigin === APP_ORIGIN && permission === "media";
+  });
+  session.setPermissionRequestHandler((webContents, permission, callback, details) => {
+    let requestingOrigin = "";
+    try {
+      requestingOrigin = new URL(webContents.getURL()).origin;
+    } catch {
+      callback(false);
+      return;
+    }
+    callback(
+      requestingOrigin === APP_ORIGIN &&
+      permission === "media" &&
+      details.mediaTypes?.includes("audio") === true
+    );
+  });
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith("https://")) void shell.openExternal(url);
     return { action: "deny" };
