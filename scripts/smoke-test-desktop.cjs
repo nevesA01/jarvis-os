@@ -43,7 +43,13 @@ const run = async () => {
     await stat(installedExecutable);
 
     const rendererPath = path.join(resourcesPath, "renderer");
-    const html = await readFile(path.join(rendererPath, "index.html"), "utf8");
+    let html;
+    try {
+      html = await readFile(path.join(rendererPath, "index.html"), "utf8");
+    } catch (error) {
+      const resources = await readdir(resourcesPath).catch(() => []);
+      throw new Error(`Installed renderer is missing at ${rendererPath}. Resources found: ${resources.join(", ") || "none"}. ${error.message}`);
+    }
     const jsPath = html.match(/<script[^>]+src="([^\"]+\.js)"/)?.[1];
     const cssPath = html.match(/<link[^>]+href="([^\"]+\.css)"/)?.[1];
     assert.ok(jsPath?.startsWith("/assets/"), "The installed renderer must include its JavaScript bundle");

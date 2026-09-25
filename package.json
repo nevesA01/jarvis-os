@@ -24,15 +24,7 @@
     "files": [
       "electron/**/*"
     ],
-    "extraResources": [
-      {
-        "from": ".output/public",
-        "to": "renderer",
-        "filter": [
-          "**/*"
-        ]
-      }
-    ],
+    "afterPack": "scripts/ensure-desktop-renderer.cjs",
     "extraMetadata": {
       "main": "electron/main.cjs"
     },
