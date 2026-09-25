@@ -7,6 +7,7 @@ const path = require("node:path");
 
 const execFileAsync = promisify(execFile);
 const packageJson = require("../package.json");
+const buildInfoPath = path.resolve("release", "desktop-build.json");
 const installerPath = path.resolve("release", `Jarvis-OS-Setup-${packageJson.version}.exe`);
 const updateInfoPath = path.resolve("release", "latest.yml");
 const blockmapPath = `${installerPath}.blockmap`;
@@ -25,8 +26,14 @@ const stopApp = async (child) => {
 };
 
 const run = async () => {
+  process.stdout.write(`Desktop smoke test revision: ${process.env.GITHUB_SHA || "local"}\n`);
   assert.equal(process.platform, "win32", "The installer smoke test must run on Windows");
-  await Promise.all([stat(installerPath), stat(blockmapPath)]);
+  await Promise.all([stat(installerPath), stat(blockmapPath), stat(buildInfoPath)]);
+
+  const buildInfo = JSON.parse(await readFile(buildInfoPath, "utf8"));
+  assert.equal(buildInfo.commit, process.env.GITHUB_SHA || "local", "The installer must come from this workflow revision");
+  assert.equal(buildInfo.version, packageJson.version, "The installer version must match package.json");
+  assert.ok(buildInfo.rendererHook, "The installer build must verify the renderer hook");
 
   const updateInfo = await readFile(updateInfoPath, "utf8");
   assert.match(updateInfo, new RegExp(`^version:\\s*["']?${packageJson.version}`, "m"));
@@ -42,13 +49,25 @@ const run = async () => {
     await execFileAsync(installerPath, ["/S", `/D=${installPath}\\`], { timeout: 180000, windowsHide: true });
     await stat(installedExecutable);
 
+    const installedBuildInfoPath = path.join(resourcesPath, "desktop-build.json");
+    let installedBuildInfo;
+    try {
+      installedBuildInfo = JSON.parse(await readFile(installedBuildInfoPath, "utf8"));
+    } catch (error) {
+      throw new Error(`Installed build metadata is missing at ${installedBuildInfoPath}; this installer may be stale. ${error.message}`);
+    }
+    assert.equal(installedBuildInfo.commit, process.env.GITHUB_SHA || "local", "The installed app must match this workflow revision");
+    assert.equal(installedBuildInfo.version, packageJson.version, "The installed app version must match package.json");
+    assert.ok(installedBuildInfo.rendererHook, "The installed app must include the verified renderer hook");
+
     const rendererPath = path.join(resourcesPath, "renderer");
     let html;
     try {
       html = await readFile(path.join(rendererPath, "index.html"), "utf8");
     } catch (error) {
       const resources = await readdir(resourcesPath).catch(() => []);
-      throw new Error(`Installed renderer is missing at ${rendererPath}. Resources found: ${resources.join(", ") || "none"}. ${error.message}`);
+      const installedBuildInfo = await readFile(path.join(resourcesPath, "desktop-build.json"), "utf8").catch(() => "missing");
+      throw new Error(`Installed renderer is missing at ${rendererPath}. Installer build proof: ${installedBuildInfo}. Resources found: ${resources.join(", ") || "none"}. ${error.message}`);
     }
     const jsPath = html.match(/<script[^>]+src="([^\"]+\.js)"/)?.[1];
     const cssPath = html.match(/<link[^>]+href="([^\"]+\.css)"/)?.[1];

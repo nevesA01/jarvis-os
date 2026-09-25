@@ -1,4 +1,4 @@
-const { cp, mkdir, readFile, rm } = require("node:fs/promises");
+const { cp, mkdir, readFile, rm, writeFile } = require("node:fs/promises");
 const path = require("node:path");
 
 module.exports = async ({ appOutDir }) => {
@@ -22,6 +22,19 @@ module.exports = async ({ appOutDir }) => {
     readFile(path.join(rendererPath, jsPath.slice(1))),
     readFile(path.join(rendererPath, cssPath.slice(1))),
   ]);
+
+  const packageJson = require(path.resolve(__dirname, "..", "package.json"));
+  const buildInfoPath = path.resolve(__dirname, "..", "release", "desktop-build.json");
+  await mkdir(path.dirname(buildInfoPath), { recursive: true });
+  const buildInfo = JSON.stringify({
+    commit: process.env.GITHUB_SHA || "local",
+    version: packageJson.version,
+    rendererHook: true,
+    rendererPath,
+  }, null, 2);
+  await writeFile(buildInfoPath, buildInfo);
+  await writeFile(path.join(path.dirname(rendererPath), "desktop-build.json"), buildInfo);
+  await writeFile(path.join(path.dirname(appOutDir), "desktop-build.json"), buildInfo);
 
   process.stdout.write(`Renderer packaged at ${rendererPath}\n`);
 };

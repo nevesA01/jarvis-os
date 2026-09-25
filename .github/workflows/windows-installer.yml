@@ -3,6 +3,8 @@ name: Windows installer
 on:
   workflow_dispatch:
   push:
+    branches:
+      - main
     tags:
       - "v*"
 
@@ -15,6 +17,12 @@ jobs:
     steps:
       - name: Check out source repository
         uses: actions/checkout@v4
+
+      - name: Verify desktop packaging revision
+        shell: pwsh
+        run: |
+          git rev-parse HEAD
+          node -e "const fs = require('node:fs'); const build = require('./package.json').build; if (build.afterPack !== 'scripts/ensure-desktop-renderer.cjs' || !fs.existsSync(build.afterPack)) throw new Error('Current checkout does not contain the renderer packaging fix'); console.log('Renderer packaging hook verified.');"
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
@@ -41,6 +49,17 @@ jobs:
 
       - name: Build the installer
         run: pnpm run desktop:win
+
+      - name: Verify packaged renderer and build identity
+        shell: pwsh
+        run: |
+          $version = (Get-Content package.json | ConvertFrom-Json).version
+          $appOut = "release/win-unpacked"
+          $buildInfo = Get-Content "$appOut/resources/desktop-build.json" | ConvertFrom-Json
+          if ($buildInfo.commit -ne $env:GITHUB_SHA) { throw "Packaged build commit does not match workflow revision" }
+          if ($buildInfo.version -ne $version) { throw "Packaged build version does not match package.json" }
+          if (-not (Test-Path "$appOut/resources/renderer/index.html")) { throw "Packaged renderer index.html is missing" }
+          Get-ChildItem "$appOut/resources/renderer" -Recurse
 
       - name: Test the installed application
         run: pnpm run desktop:smoke
